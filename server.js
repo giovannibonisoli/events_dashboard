@@ -37,6 +37,41 @@ app.post('/api/newspapers', (req, res) => {
   }
 });
 
+const VALIDATED_FILE = path.join(__dirname, 'validated_news.json');
+
+function readValidated() {
+  try {
+    return JSON.parse(fs.readFileSync(VALIDATED_FILE, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function writeValidated(data) {
+  fs.writeFileSync(VALIDATED_FILE, JSON.stringify(data, null, 2));
+}
+
+app.get('/api/validated-news', (req, res) => {
+  res.json(readValidated());
+});
+
+app.post('/api/validated-news', (req, res) => {
+  const entry = req.body;
+  if (!entry || !entry.url) {
+    return res.status(400).json({ error: 'Validation entry with url required' });
+  }
+
+  const list = readValidated();
+  const idx = list.findIndex(e => e.url === entry.url);
+  if (idx >= 0) {
+    list[idx] = entry;
+  } else {
+    list.push(entry);
+  }
+  writeValidated(list);
+  res.status(201).json({ ok: true });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });

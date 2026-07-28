@@ -358,6 +358,7 @@ function updateMarkers(filteredEvents, keyword) {
             </div>
         ` : '';
 
+        const eventUrl = event.url ? event.url.replace(/'/g, "\\'") : '';
         marker.bindPopup(`
             <div style="min-width:220px;">
                 <b style="font-size:15px;color:#0d1321;">${hl(event.place, keyword)}</b><br>
@@ -368,6 +369,11 @@ function updateMarkers(filteredEvents, keyword) {
                 <div style="font-size:12.5px;color:#555;margin-top:7px;line-height:1.5;">
                     ${renderInfoObject(event.key_info, keyword)}
                     ${urlHtml}
+                </div>
+                <div style="margin-top:8px;border-top:1px solid #eee;padding-top:6px;text-align:center;">
+                    <button onclick="window.openValidationByUrl('${eventUrl}')" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Outfit,sans-serif;display:inline-flex;align-items:center;gap:4px;">
+                        <i class="fas fa-clipboard-check"></i> Validate
+                    </button>
                 </div>
             </div>
         `);
@@ -497,19 +503,24 @@ function updateEventsList(filteredEvents) {
             ` : '';
             
             return `
-                <div class="event-item" onclick="zoomToEvent(${e.coordinates.lat}, ${e.coordinates.lng})" style="border-left-color:${config.color};">
-                    <div class="event-title">
-                        <i class="fas ${config.icon}" style="color:${config.color};width:16px;"></i>
-                        ${hl(e.place, keyword)}
+                <div class="event-item" style="border-left-color:${config.color};">
+                    <div onclick="zoomToEvent(${e.coordinates.lat}, ${e.coordinates.lng})">
+                        <div class="event-title">
+                            <i class="fas ${config.icon}" style="color:${config.color};width:16px;"></i>
+                            ${hl(e.place, keyword)}
+                        </div>
+                        <div class="event-date">${formatDate(e.date)}</div>
+                        <span class="event-type ${config.key}">
+                            <i class="fas ${config.icon}"></i> ${categoryLabel}
+                        </span>
+                        <div class="event-info">
+                            ${renderInfoObject(e.key_info, keyword)}
+                            ${urlHtml}
+                        </div>
                     </div>
-                    <div class="event-date">${formatDate(e.date)}</div>
-                    <span class="event-type ${config.key}">
-                        <i class="fas ${config.icon}"></i> ${categoryLabel}
-                    </span>
-                    <div class="event-info">
-                        ${renderInfoObject(e.key_info, keyword)}
-                        ${urlHtml}
-                    </div>
+                    <button class="btn-validate" data-url="${e.url.replace(/"/g, '&quot;')}" onclick="event.stopPropagation(); openValidation(this)" title="Validate annotation">
+                        <i class="fas fa-clipboard-check"></i> Validate
+                    </button>
                 </div>
             `;
         } catch (err) {
@@ -522,6 +533,43 @@ function updateEventsList(filteredEvents) {
 // =============================================
 // 7. UTILITIES
 // =============================================
+async function exportValidatedNews() {
+    try {
+        const resp = await fetch('/api/validated-news');
+        if (!resp.ok) throw new Error('No validated news found');
+        const data = await resp.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'validated_news.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        const t = translations[currentLanguage] || translations['en'];
+        alert(err.message);
+    }
+}
+
+window.openValidationByUrl = function(url) {
+    if (!url) return;
+    const event = events.find(e => e.url === url);
+    if (event) {
+        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
+        window.location.href = 'validation.html';
+    }
+};
+
+function openValidation(btn) {
+    const url = btn.dataset.url;
+    if (!url) return;
+    const event = events.find(e => e.url === url);
+    if (event) {
+        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
+        window.location.href = 'validation.html';
+    }
+}
+
 function formatDate(dateStr) {
     const [year, month, day] = dateStr.split('-');
     return `${day}/${month}/${year}`;

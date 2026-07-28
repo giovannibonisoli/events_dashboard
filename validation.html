@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventAtlas — Validation</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+        .validation-page { max-width: 1000px; margin: 0 auto; padding: 32px 24px; }
+        .validation-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+        .validation-header h1 { font-family: 'Outfit', sans-serif; font-size: 24px; margin: 0; }
+        .btn-back {
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--text); padding: 8px 16px; border-radius: 8px;
+            cursor: pointer; font-size: 14px; display: flex; align-items: center;
+            gap: 6px; transition: all .2s;
+        }
+        .btn-back:hover { background: var(--bg-hover); }
+        .validation-meta {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px;
+        }
+        .validation-meta .meta-item {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 16px 20px;
+        }
+        .validation-meta .meta-item .meta-label {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: .5px; font-family: 'IBM Plex Mono', monospace;
+        }
+        .validation-meta .meta-item .meta-value { font-size: 14px; color: var(--text); margin-top: 4px; }
+        .category-tag {
+            display: inline-block; padding: 2px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 600;
+        }
+        .key-info-section { margin-top: 12px; }
+        .key-info-section .key-info-title {
+            font-size: 12px; font-weight: 600; color: var(--text-muted);
+            font-family: 'IBM Plex Mono', monospace; text-transform: uppercase;
+            letter-spacing: .5px; margin-bottom: 8px;
+        }
+
+        .validation-fields { display: flex; flex-direction: column; gap: 8px; }
+        .validation-field {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 18px;
+            transition: border-color .2s;
+        }
+        .validation-field.status-incomplete { border-color: #ff9800; }
+        .validation-field.status-wrong { border-color: #f44336; }
+        .validation-field.status-correct { border-color: #4caf50; }
+        .validation-field .field-row {
+            display: flex; align-items: flex-start; gap: 12px;
+        }
+        .validation-field .field-info { flex: 1; min-width: 0; }
+        .validation-field .field-name {
+            font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+            font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: .5px;
+        }
+        .validation-field .field-value {
+            font-size: 13.5px; color: var(--text); line-height: 1.5;
+            word-break: break-word; margin-top: 2px;
+        }
+        .validation-field .field-value.null-value { color: var(--text-muted); font-style: italic; }
+        .validation-field .field-value.url-value a { color: var(--accent); text-decoration: none; }
+        .validation-field .field-value.url-value a:hover { text-decoration: underline; }
+        .validation-field .field-status {
+            display: flex; gap: 3px; flex-shrink: 0;
+        }
+        .validation-field .field-status button {
+            width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid var(--border);
+            background: transparent; cursor: pointer; font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all .15s; color: var(--text-muted);
+        }
+        .validation-field .field-status button:hover { background: var(--bg-hover); }
+        .validation-field .field-status button.active-correct {
+            background: #4caf50; color: #fff; border-color: #4caf50;
+        }
+        .validation-field .field-status button.active-incomplete {
+            background: #ff9800; color: #fff; border-color: #ff9800;
+        }
+        .validation-field .field-status button.active-wrong {
+            background: #f44336; color: #fff; border-color: #f44336;
+        }
+        .validation-field .field-correction {
+            display: none; margin-top: 10px; padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        .validation-field .field-correction.show { display: block; }
+        .validation-field .field-correction input,
+        .validation-field .field-correction textarea {
+            width: 100%; padding: 8px 12px;
+            border: 1px solid var(--border); border-radius: 6px;
+            background: var(--bg); color: var(--text);
+            font-size: 13px; font-family: 'DM Sans', sans-serif;
+        }
+        .validation-field .field-correction textarea { min-height: 50px; resize: vertical; }
+        .validation-field .field-correction .correction-label {
+            font-size: 11px; font-weight: 600; color: var(--text-muted);
+            margin-bottom: 4px; font-family: 'IBM Plex Mono', monospace;
+            text-transform: uppercase; letter-spacing: .3px;
+        }
+        .validation-actions { display: flex; gap: 12px; margin-top: 24px; }
+        .btn-save-validation {
+            background: var(--accent); color: #fff; border: none;
+            padding: 12px 28px; border-radius: 8px; font-size: 14px;
+            font-weight: 600; display: flex; align-items: center; gap: 8px;
+            cursor: pointer; transition: opacity .2s;
+        }
+        .btn-save-validation:hover { opacity: .85; }
+        .validation-notification {
+            display: none; padding: 12px 20px; border-radius: 8px;
+            font-size: 14px; font-weight: 500; margin-top: 16px;
+        }
+        .validation-notification.success {
+            display: block; background: #1b5e2022; color: #2e7d32; border: 1px solid #2e7d3244;
+        }
+        .validation-notification.error {
+            display: block; background: #b71c1c22; color: #c62828; border: 1px solid #c6282844;
+        }
+        .no-event { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .no-event i { font-size: 48px; margin-bottom: 16px; opacity: .4; }
+        .no-event h2 { font-family: 'Outfit', sans-serif; font-size: 20px; margin: 0 0 8px 0; }
+        .progress-bar {
+            height: 4px; background: var(--border); border-radius: 4px;
+            margin-bottom: 24px; overflow: hidden;
+        }
+        .progress-bar .progress-fill {
+            height: 100%; background: var(--accent); border-radius: 4px;
+            transition: width .3s;
+        }
+        .progress-text {
+            font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="validation-page">
+        <div class="validation-header">
+            <button class="btn-back" onclick="window.location.href='event_atlas.html'">
+                <i class="fas fa-arrow-left"></i> Back to dashboard
+            </button>
+            <h1><i class="fas fa-clipboard-check" style="color:var(--accent);"></i> Validate Annotation</h1>
+        </div>
+        <div id="validationContent"></div>
+    </div>
+
+    <script>
+        const categoryConfig = {
+            'crime': { color: '#b71c1c', icon: 'fa-gavel', label: 'Crime' },
+            'justice': { color: '#4a148c', icon: 'fa-balance-scale', label: 'Justice & Public Order' },
+            'accidents': { color: '#bf360c', icon: 'fa-car-crash', label: 'Accidents & Emergencies' },
+            'weather': { color: '#f57f17', icon: 'fa-cloud-rain', label: 'Weather Alerts' },
+            'health': { color: '#1b5e20', icon: 'fa-heartbeat', label: 'Health' },
+            'society': { color: '#01579b', icon: 'fa-users', label: 'Society & Daily Life' },
+            'sport': { color: '#4e342e', icon: 'fa-futbol', label: 'Sport' },
+            'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' }
+        };
+
+        function getEvent() {
+            try {
+                const data = sessionStorage.getItem('validatingEvent');
+                if (!data) return null;
+                return JSON.parse(data);
+            } catch (e) {
+                console.error('Failed to parse event data:', e);
+                return null;
+            }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}/${y}`;
+        }
+
+        function renderValue(val) {
+            if (val === null || val === undefined || val === '') {
+                return '<span class="null-value">—</span>';
+            }
+            if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+            if (typeof val === 'object' && val.day) return `${val.day}/${val.month}/${val.year}`;
+            if (typeof val === 'string' && val.startsWith('http')) {
+                return `<span class="url-value"><a href="${val}" target="_blank">${val}</a></span>`;
+            }
+            return String(val);
+        }
+
+        function renderField(name, value, savedState) {
+            const displayName = name.replace(/^key_info\./, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const isNull = value === null || value === undefined || value === '';
+            const savedStatus = savedState?.status || '';
+            const correction = savedState?.correction || '';
+            const isKeyInfo = name.startsWith('key_info.');
+            const prefix = isKeyInfo ? '<span style="font-size:10px;color:var(--text-muted);font-weight:400;">KEY_INFO › </span>' : '';
+
+            const hasStatus = savedStatus ? 'status-' + savedStatus : '';
+
+            return `
+                <div class="validation-field ${hasStatus}" data-field="${name}">
+                    <div class="field-row">
+                        <div class="field-info">
+                            <div class="field-name">${prefix}${displayName}</div>
+                            <div class="field-value ${isNull ? 'null-value' : ''}">${renderValue(value)}</div>
+                        </div>
+                        <div class="field-status">
+                            <button type="button" class="${savedStatus === 'correct' ? 'active-correct' : ''}" data-status="correct" title="Correct" onclick="setFieldStatus(this, '${name}')">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button type="button" class="${savedStatus === 'incomplete' ? 'active-incomplete' : ''}" data-status="incomplete" title="Incomplete" onclick="setFieldStatus(this, '${name}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="${savedStatus === 'wrong' ? 'active-wrong' : ''}" data-status="wrong" title="Wrong" onclick="setFieldStatus(this, '${name}')">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="field-correction ${(savedStatus === 'incomplete' || savedStatus === 'wrong') ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <input type="text" placeholder="Enter the correct value..." value="${correction.replace(/"/g, '&quot;')}">
+                    </div>
+                </div>
+            `;
+        }
+
+        function setFieldStatus(btn, fieldName) {
+            const field = btn.closest('.validation-field');
+            const status = btn.dataset.status;
+
+            field.querySelectorAll('.field-status button').forEach(b => {
+                b.className = '';
+            });
+            btn.classList.add('active-' + status);
+            field.className = 'validation-field status-' + status;
+
+            const correction = field.querySelector('.field-correction');
+            if (status === 'incomplete' || status === 'wrong') {
+                correction.classList.add('show');
+                correction.querySelector('input, textarea')?.focus();
+            } else {
+                correction.classList.remove('show');
+            }
+            updateProgress();
+        }
+
+        function getAllFieldNames(event) {
+            const metaFields = [
+                'date', 'is_event', 'category', 'place',
+                'county', 'street', 'loc_description', 'end_date'
+            ];
+            const keyInfoFields = Object.keys(event.key_info || {}).map(k => 'key_info.' + k);
+            return [...metaFields, ...keyInfoFields];
+        }
+
+        function getFieldsState() {
+            const state = {};
+            document.querySelectorAll('.validation-field').forEach(el => {
+                const name = el.dataset.field;
+                const activeBtn = el.querySelector('.field-status button[class*="active-"]');
+                if (!activeBtn) return;
+                const status = activeBtn.dataset.status;
+                const correctionInput = el.querySelector('.field-correction input, .field-correction textarea');
+                const correction = correctionInput?.value?.trim() || '';
+                state[name] = { status, correction: correction || null };
+            });
+            return state;
+        }
+
+        function updateProgress() {
+            const fields = document.querySelectorAll('.validation-field');
+            const total = fields.length;
+            if (total === 0) return;
+            let done = 0;
+            fields.forEach(el => {
+                const activeBtn = el.querySelector('.field-status button[class*="active-"]');
+                if (activeBtn) done++;
+            });
+            const pct = Math.round((done / total) * 100);
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressText').textContent = `${done} / ${total} fields validated`;
+        }
+
+        function render() {
+            const event = getEvent();
+            const container = document.getElementById('validationContent');
+
+            if (!event) {
+                container.innerHTML = `
+                    <div class="no-event">
+                        <i class="fas fa-inbox"></i>
+                        <h2>No event selected</h2>
+                        <p>Go back to the dashboard and click "Validate" on an event card.</p>
+                        <button class="btn-back" onclick="window.location.href='event_atlas.html'" style="margin:16px auto;">
+                            <i class="fas fa-arrow-left"></i> Back to dashboard
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const cfg = categoryConfig[event.category] || categoryConfig.crime;
+            const fields = getAllFieldNames(event);
+
+            const savedKey = 'validation_' + event.url;
+            let savedState = null;
+            try {
+                const s = localStorage.getItem(savedKey);
+                if (s) savedState = JSON.parse(s);
+            } catch (e) {}
+
+            const savedFields = savedState?.fields || {};
+
+            container.innerHTML = `
+                <div class="validation-meta" style="grid-template-columns:1fr 1fr 1fr;">
+                    <div class="meta-item">
+                        <div class="meta-label">Newspaper</div>
+                        <div class="meta-value">${event.newspaper || '—'}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">URL</div>
+                        <div class="meta-value" style="font-size:12px;word-break:break-all;">${event.url ? '<a href="'+event.url+'" target="_blank" style="color:var(--accent);text-decoration:none;">'+event.url+'</a>' : '—'}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Publication Date</div>
+                        <div class="meta-value">${formatDate(event.publication_date) || '—'}</div>
+                    </div>
+                </div>
+
+                <div class="progress-text" id="progressText">0 / ${fields.length} fields validated</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                </div>
+
+                <div class="validation-fields">
+                    ${fields.map(f => renderField(f, f.startsWith('key_info.') ? (event.key_info || {})[f.replace('key_info.', '')] : event[f], savedFields[f])).join('')}
+                </div>
+
+                <div class="validation-actions">
+                    <button class="btn-save-validation" onclick="saveValidation()">
+                        <i class="fas fa-floppy-disk"></i> Save Validation
+                    </button>
+                    <button class="btn-save-validation" onclick="saveAndNext()" style="background:var(--text-muted);">
+                        <i class="fas fa-forward"></i> Save &amp; Go to list
+                    </button>
+                </div>
+                <div id="validationNotification"></div>
+            `;
+
+            updateProgress();
+        }
+
+        async function saveValidation() {
+            const event = getEvent();
+            if (!event) return;
+
+            const fields = getFieldsState();
+
+            const validation = {
+                url: event.url,
+                date: event.date,
+                place: event.place,
+                category: event.category,
+                newspaper: event.newspaper,
+                fields: fields,
+                validated_at: new Date().toISOString()
+            };
+
+            try {
+                const resp = await fetch('/api/validated-news', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(validation)
+                });
+                if (!resp.ok) throw new Error('Save failed');
+                localStorage.setItem('validation_' + event.url, JSON.stringify(validation));
+                showNotification('Validation saved successfully!', 'success');
+            } catch (err) {
+                localStorage.setItem('validation_' + event.url, JSON.stringify(validation));
+                showNotification('Saved locally (server unavailable).', 'success');
+            }
+        }
+
+        async function saveAndNext() {
+            await saveValidation();
+            window.location.href = 'event_atlas.html';
+        }
+
+        function showNotification(msg, type) {
+            const el = document.getElementById('validationNotification');
+            el.className = 'validation-notification ' + type;
+            el.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i> ' + msg;
+        }
+
+        document.addEventListener('DOMContentLoaded', render);
+    </script>
+</body>
+</html>
