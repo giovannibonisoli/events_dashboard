@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EventAtlas — Sources</title>
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+        <!-- Google Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+        <link rel="stylesheet" href="styles.css" />
+        <style>
+            .sources-page { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+
+            .sources-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 32px;
+                padding-bottom: 20px;
+                border-bottom: 2px solid var(--ink);
+            }
+
+            .sources-header-right {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .page-title {
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 22px;
+                font-weight: 600;
+                margin-bottom: 6px;
+            }
+
+            .page-desc {
+                font-size: 14px;
+                color: var(--ink-soft);
+                margin-bottom: 28px;
+            }
+
+            .sources-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                gap: 12px;
+            }
+
+            .source-card {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 14px 16px;
+                background: var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                text-decoration: none;
+                color: var(--ink);
+                transition: all 0.2s ease;
+                box-shadow: var(--shadow);
+            }
+
+            .source-card:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-lg);
+                border-color: var(--accent);
+            }
+
+            .source-icon {
+                width: 36px;
+                height: 36px;
+                background: var(--accent-dim);
+                color: var(--accent);
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 14px;
+                flex-shrink: 0;
+            }
+
+            .source-info { flex: 1; min-width: 0; }
+
+            .source-name {
+                font-weight: 600;
+                font-size: 13px;
+                text-transform: capitalize;
+            }
+
+            .source-url {
+                font-family: 'IBM Plex Mono', monospace;
+                font-size: 10px;
+                color: var(--ink-soft);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .source-arrow {
+                color: var(--ink-soft);
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+
+            .source-count {
+                font-family: 'IBM Plex Mono', monospace;
+                font-size: 12px;
+                color: var(--ink-soft);
+                margin-bottom: 16px;
+            }
+
+            .add-source-form {
+                display: flex;
+                align-items: flex-end;
+                gap: 12px;
+                margin-bottom: 24px;
+                padding: 16px;
+                background: var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                box-shadow: var(--shadow);
+            }
+
+            .add-source-field {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .add-source-field label {
+                font-family: 'IBM Plex Mono', monospace;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: var(--ink-soft);
+            }
+
+            .add-source-field input {
+                padding: 10px 12px;
+                border: 1.5px solid var(--line);
+                border-radius: 8px;
+                font-size: 14px;
+                font-family: 'Outfit', sans-serif;
+                color: var(--ink);
+                background: var(--paper);
+                transition: all 0.2s ease;
+            }
+
+            .add-source-field input:focus {
+                outline: none;
+                border-color: var(--accent);
+            }
+
+            .btn-add-source {
+                padding: 10px 20px;
+                background: var(--accent);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                font-family: 'Outfit', sans-serif;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: all 0.2s ease;
+            }
+
+            .btn-add-source:hover {
+                background: var(--accent-hover);
+            }
+
+            .add-source-feedback {
+                display: none;
+                padding: 10px 16px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                margin-top: 10px;
+                animation: fadeIn 0.3s ease;
+            }
+
+            .add-source-feedback.show {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .add-source-feedback.success {
+                background: #dcfce7;
+                color: #166534;
+                border: 1px solid #86efac;
+            }
+
+            .add-source-feedback.error {
+                background: #fee2e2;
+                color: #991b1b;
+                border: 1px solid #fca5a5;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(-4px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            @media (max-width: 600px) {
+                .sources-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+                .sources-grid { grid-template-columns: 1fr; }
+                .add-source-form { flex-direction: column; align-items: stretch; }
+            }
+        </style>
+    </head>
+<body>
+    <div class="sources-page">
+        <div class="sources-header">
+            <div>
+                <div class="brand-mark">Event<span class="accent">Atlas</span></div>
+                <div class="brand-sub" id="brandSub">Source Directory</div>
+            </div>
+            <div class="sources-header-right">
+                <div class="language-selector">
+                    <select id="languageSelect" onchange="switchLanguage(this.value)">
+                        <option value="en">English</option>
+                        <option value="it">Italiano</option>
+                    </select>
+                </div>
+                <a href="event_atlas.html" class="btn-back" id="btnBack"><i class="fas fa-arrow-left"></i> <span id="btnBackText">Back to Dashboard</span></a>
+            </div>
+        </div>
+
+        <h1 class="page-title" id="pageTitle">Newspaper Sources</h1>
+        <p class="page-desc" id="pageDesc">All news outlets that feed events into EventAtlas.</p>
+        <div class="source-count" id="sourceCount"></div>
+
+        <div class="add-source-form">
+            <div class="add-source-field">
+                <label for="sourceName">Name</label>
+                <input type="text" id="sourceName" placeholder="e.g. gazzettadimilano">
+            </div>
+            <div class="add-source-field">
+                <label for="sourceUrl">URL</label>
+                <input type="url" id="sourceUrl" placeholder="https://www.example.it">
+            </div>
+            <button class="btn-add-source" onclick="addSource()"><i class="fas fa-plus"></i> <span id="btnAddText">Add Source</span></button>
+            <div class="add-source-feedback" id="addFeedback"></div>
+        </div>
+
+        <div class="sources-grid" id="sourcesGrid"></div>
+    </div>
+
+    <script>
+        const translations = {
+            en: {
+                brandSub: 'Source Directory',
+                btnBack: 'Back to Dashboard',
+                pageTitle: 'Newspaper Sources',
+                pageDesc: 'All news outlets that feed events into EventAtlas.',
+                sourcesCount: (n) => `${n} sources`,
+                nameLabel: 'Name',
+                urlLabel: 'URL',
+                namePlaceholder: 'e.g. gazzettadimilano',
+                urlPlaceholder: 'https://www.example.it',
+                btnAdd: 'Add Source'
+            },
+            it: {
+                brandSub: 'Elenco Fonti',
+                btnBack: 'Torna alla Dashboard',
+                pageTitle: 'Fonti Giornalistiche',
+                pageDesc: 'Tutte le testate che alimentano gli eventi di EventAtlas.',
+                sourcesCount: (n) => `${n} fonti`,
+                nameLabel: 'Nome',
+                urlLabel: 'URL',
+                namePlaceholder: 'es. gazzettadimilano',
+                urlPlaceholder: 'https://www.example.it',
+                btnAdd: 'Aggiungi Fonte'
+            }
+        };
+
+        let currentLang = 'en';
+        let sourcesData = [];
+
+        function updateTexts(lang) {
+            const t = translations[lang];
+            document.getElementById('brandSub').textContent = t.brandSub;
+            document.getElementById('btnBackText').textContent = t.btnBack;
+            document.getElementById('pageTitle').textContent = t.pageTitle;
+            document.getElementById('pageDesc').textContent = t.pageDesc;
+            document.getElementById('sourceCount').textContent = t.sourcesCount(sourcesData.length);
+            document.getElementById('sourceName').placeholder = t.namePlaceholder;
+            document.getElementById('sourceUrl').placeholder = t.urlPlaceholder;
+            document.getElementById('btnAddText').textContent = t.btnAdd;
+            document.querySelectorAll('.add-source-field label')[0].textContent = t.nameLabel;
+            document.querySelectorAll('.add-source-field label')[1].textContent = t.urlLabel;
+            document.title = `EventAtlas — ${t.pageTitle}`;
+        }
+
+        function switchLanguage(lang) {
+            currentLang = lang;
+            updateTexts(lang);
+        }
+
+        async function loadSources() {
+            try {
+                const response = await fetch('newspapers.json');
+                const data = await response.json();
+                const grid = document.getElementById('sourcesGrid');
+
+                sourcesData = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
+
+                grid.innerHTML = sourcesData.map(([name, url]) => `
+                    <a href="${url}" target="_blank" rel="noopener noreferrer" class="source-card">
+                        <div class="source-icon"><i class="fas fa-newspaper"></i></div>
+                        <div class="source-info">
+                            <div class="source-name">${name.replace(/-/g, ' ')}</div>
+                            <div class="source-url">${url}</div>
+                        </div>
+                        <div class="source-arrow"><i class="fas fa-external-link-alt"></i></div>
+                    </a>
+                `).join('');
+
+                document.getElementById('languageSelect').value = 'en';
+                switchLanguage('en');
+            } catch (error) {
+                console.error('Error loading sources:', error);
+            }
+        }
+
+        loadSources();
+
+        async function addSource() {
+            const nameInput = document.getElementById('sourceName');
+            const urlInput = document.getElementById('sourceUrl');
+            const feedback = document.getElementById('addFeedback');
+            const name = nameInput.value.trim();
+            const url = urlInput.value.trim();
+
+            if (!name || !url) {
+                feedback.className = 'add-source-feedback show error';
+                feedback.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please fill in both fields';
+                setTimeout(() => feedback.className = 'add-source-feedback', 3000);
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/newspapers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, url })
+                });
+
+                if (res.ok) {
+                    nameInput.value = '';
+                    urlInput.value = '';
+                    feedback.className = 'add-source-feedback show success';
+                    feedback.innerHTML = '<i class="fas fa-check-circle"></i> "' + name + '" added successfully';
+                    await loadSources();
+                } else {
+                    feedback.className = 'add-source-feedback show error';
+                    feedback.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error adding source';
+                }
+            } catch (err) {
+                feedback.className = 'add-source-feedback show error';
+                feedback.innerHTML = '<i class="fas fa-exclamation-circle"></i> Connection error';
+            }
+
+            setTimeout(() => feedback.className = 'add-source-feedback', 4000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EventAtlas — Event Dashboard</title>
+    
+        <!-- Leaflet CSS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <!-- Leaflet-Geoman CSS (replaces Leaflet-Draw) - DEVE venire DOPO Leaflet CSS -->
+        <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.3/dist/leaflet-geoman.css" />
+    
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+        <!-- Google Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">Event<span class="accent">Atlas</span></div>
+                <div class="brand-sub">Event Monitoring System</div>
+                <!-- Selettore lingua con select -->
+                <div class="language-selector">
+                    <select id="languageSelect" onchange="switchLanguage(this.value)">
+                        <option value="en">🇬🇧 English</option>
+                        <option value="it">🇮🇹 Italiano</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="body-content">
+<div class="filter-section">
+    <label><i class="fas fa-calendar-day"></i> Date range</label>
+    <div class="date-range">
+        <input type="date" id="startDate">
+        <input type="date" id="endDate">
+    </div>
+</div>
+
+<div class="filter-section">
+    <label><i class="fas fa-search"></i> Keyword search</label>
+    <input type="text" id="keywordSearch" placeholder="Search events...">
+</div>
+
+                <div class="filter-section">
+                    <label><i class="fas fa-tag"></i> Event categories</label>
+                    <div class="category-checkboxes" id="categoryCheckboxes">
+                        <button type="button" class="btn-select-all active" onclick="selectAllCategories()">All</button>
+                        <label class="category-option">
+                            <input type="checkbox" value="crime" checked onchange="updateSelectAllButton()"> <span class="category-label">Crime</span>
+                        </label>
+                        <label class="category-option">
+                            <input type="checkbox" value="justice" checked onchange="updateSelectAllButton()"> <span class="category-label">Justice</span>
+                        </label>
+                        <label class="category-option">
+                            <input type="checkbox" value="accidents" checked onchange="updateSelectAllButton()"> <span class="category-label">Accidents</span>
+                        </label>
+                        <label class="category-option">
+                            <input type="checkbox" value="weather" checked onchange="updateSelectAllButton()"> <span class="category-label">Weather</span>
+                        </label>
+                        <label class="category-option">
+                            <input type="checkbox" value="health" checked onchange="updateSelectAllButton()"> <span class="category-label">Health</span>
+                        </label>
+                        <label class="category-option">
+                            <input type="checkbox" value="society" checked onchange="updateSelectAllButton()"> <span class="category-label">Society</span>
+                        </label>
+                        <label class="category-option">
+                            <input type="checkbox" value="sport" checked onchange="updateSelectAllButton()"> <span class="category-label">Sport</span>
+                        </label>
+                        <label class="category-option">
+                            <input type="checkbox" value="culture" checked onchange="updateSelectAllButton()"> <span class="category-label">Culture</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn-apply" onclick="applyFilters()"><i class="fas fa-magnifying-glass"></i> Apply filters</button>
+                <button class="btn-reset" onclick="resetFilters()"><i class="fas fa-rotate-left"></i> Reset</button>
+                <button class="btn-sources" onclick="window.location.href='newspapers.html'"><i class="fas fa-newspaper"></i> Sources</button>
+
+                <div class="events-list">
+                    <h3>Events found <span class="count" id="eventCount">0</span></h3>
+                    <div id="eventsContainer">
+                        <div class="no-events">No events selected</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div class="map-container">
+            <div id="map"></div>
+
+            <div id="mapInfo" class="map-info">
+                <span id="mapInfoText">Draw a rectangle on the map to filter events by area</span>
+                <button type="button" id="mapInfoClear" class="map-info-btn" onclick="clearSelectedArea()" title="Remove area filter" style="display:none;">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="legend" id="legend">
+                <h4><i class="fas fa-tag"></i> Legend</h4>
+                <div class="legend-item"><div class="legend-icon" style="background:#b71c1c;"><i class="fas fa-gavel"></i></div><span class="legend-text">Crime</span></div>
+                <div class="legend-item"><div class="legend-icon" style="background:#4a148c;"><i class="fas fa-balance-scale"></i></div><span class="legend-text">Justice</span></div>
+                <div class="legend-item"><div class="legend-icon" style="background:#bf360c;"><i class="fas fa-car-crash"></i></div><span class="legend-text">Accidents</span></div>
+                <div class="legend-item"><div class="legend-icon" style="background:#f57f17;"><i class="fas fa-cloud-rain"></i></div><span class="legend-text">Weather</span></div>
+                <div class="legend-item"><div class="legend-icon" style="background:#1b5e20;"><i class="fas fa-heartbeat"></i></div><span class="legend-text">Health</span></div>
+                <div class="legend-item"><div class="legend-icon" style="background:#01579b;"><i class="fas fa-users"></i></div><span class="legend-text">Society</span></div>
+                <div class="legend-item"><div class="legend-icon" style="background:#4e342e;"><i class="fas fa-futbol"></i></div><span class="legend-text">Sport</span></div>
+                <div class="legend-item"><div class="legend-icon" style="background:#880e4f;"><i class="fas fa-music"></i></div><span class="legend-text">Culture</span></div>
+            </div>
+        </div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.3/dist/leaflet-geoman.js"></script>
+    <script src="script.js?v=5"></script>
+</body>
+</html>
+
