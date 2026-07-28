@@ -194,6 +194,45 @@ body {
     color: white;
 }
 
+.btn-inbox {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    color: #e65100;
+    border: 1.5px solid #e65100;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-inbox:hover {
+    background: #e65100;
+    color: white;
+}
+
+.badge-inbox {
+    background: #e65100;
+    color: #fff;
+    border-radius: 20px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.4;
+}
+
+.btn-inbox:hover .badge-inbox {
+    background: #fff;
+    color: #e65100;
+}
+
 /* Events List */
 .events-list {
     margin-top: 20px;

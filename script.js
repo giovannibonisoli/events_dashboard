@@ -421,6 +421,7 @@ function applyFilters() {
 
     let filtered = events.filter(e => {
         if (!e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null) return false;
+        if (!e.date || e.date.includes('None')) return false;
         
         if (startDate && e.date < startDate) return false;
         if (endDate && e.date > endDate) return false;
@@ -560,6 +561,15 @@ window.openValidationByUrl = function(url) {
     }
 };
 
+function updateInboxBadge() {
+    const badge = document.getElementById('inboxBadge');
+    if (!badge) return;
+    const count = events.filter(e =>
+        !e.date || e.date.includes('None') || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
+    ).length;
+    badge.textContent = count;
+}
+
 function openValidation(btn) {
     const url = btn.dataset.url;
     if (!url) return;
@@ -682,6 +692,8 @@ window.onload = async function() {
     document.getElementById('mapInfo').classList.add('show');
     setMapInfoText(translations['en'].mapInfoDefault);
 
+    // 7. Aggiorna il badge della inbox
+    updateInboxBadge();
 };
 
 // =============================================

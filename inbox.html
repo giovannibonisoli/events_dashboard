@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventAtlas — Inbox</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+        .inbox-page { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+        .inbox-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+        .inbox-header h1 { font-family: 'Outfit', sans-serif; font-size: 24px; margin: 0; }
+        .inbox-header .badge {
+            background: var(--accent); color: #fff; border-radius: 20px;
+            padding: 2px 12px; font-size: 13px; font-weight: 600;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .btn-back {
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--text); padding: 8px 16px; border-radius: 8px;
+            cursor: pointer; font-size: 14px; display: flex; align-items: center;
+            gap: 6px; transition: all .2s;
+        }
+        .btn-back:hover { background: var(--bg-hover); }
+        .inbox-empty {
+            text-align: center; padding: 60px 20px; color: var(--text-muted);
+        }
+        .inbox-empty i { font-size: 48px; margin-bottom: 16px; opacity: .4; }
+        .inbox-empty h2 { font-family: 'Outfit', sans-serif; font-size: 20px; margin: 0 0 8px 0; }
+        .inbox-list { display: flex; flex-direction: column; gap: 8px; }
+        .inbox-item {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 16px 20px;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .inbox-item .item-info { flex: 1; min-width: 0; }
+        .inbox-item .item-place {
+            font-weight: 600; font-size: 14px; color: var(--text);
+        }
+        .inbox-item .item-meta {
+            font-size: 12px; color: var(--text-muted); margin-top: 3px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .inbox-item .item-meta .reason {
+            display: inline-block; padding: 1px 8px; border-radius: 4px;
+            font-size: 10px; font-weight: 600; margin-left: 6px;
+            text-transform: uppercase;
+        }
+        .inbox-item .item-meta .reason-date { background: #ff980022; color: #e65100; }
+        .inbox-item .item-meta .reason-coords { background: #f4433622; color: #c62828; }
+        .inbox-item .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .inbox-item .item-actions button {
+            padding: 6px 14px; border-radius: 6px; font-size: 12px;
+            font-weight: 600; font-family: 'Outfit', sans-serif;
+            cursor: pointer; border: none; transition: all .2s;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .inbox-item .btn-validate-item {
+            background: #15803d; color: #fff;
+        }
+        .inbox-item .btn-validate-item:hover { opacity: .85; }
+    </style>
+</head>
+<body>
+    <div class="inbox-page">
+        <div class="inbox-header">
+            <button class="btn-back" onclick="window.location.href='event_atlas.html'">
+                <i class="fas fa-arrow-left"></i> Back to dashboard
+            </button>
+            <h1><i class="fas fa-inbox" style="color:var(--accent);"></i> Inbox</h1>
+            <span class="badge" id="inboxCount">0</span>
+        </div>
+        <div id="inboxContent"></div>
+    </div>
+
+    <script>
+        const categoryConfig = {
+            'crime': { color: '#b71c1c', icon: 'fa-gavel', label: 'Crime' },
+            'justice': { color: '#4a148c', icon: 'fa-balance-scale', label: 'Justice & Public Order' },
+            'accidents': { color: '#bf360c', icon: 'fa-car-crash', label: 'Accidents & Emergencies' },
+            'weather': { color: '#f57f17', icon: 'fa-cloud-rain', label: 'Weather Alerts' },
+            'health': { color: '#1b5e20', icon: 'fa-heartbeat', label: 'Health' },
+            'society': { color: '#01579b', icon: 'fa-users', label: 'Society & Daily Life' },
+            'sport': { color: '#4e342e', icon: 'fa-futbol', label: 'Sport' },
+            'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' }
+        };
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}/${y}`;
+        }
+
+        function getReason(event) {
+            if (!event.date || event.date.includes('None')) return 'INVALID DATE: ' + (event.date || 'null');
+            if (!event.coordinates || event.coordinates.lat == null || event.coordinates.lng == null) return 'MISSING COORDINATES';
+            return '';
+        }
+
+        async function loadInbox() {
+            const container = document.getElementById('inboxContent');
+            container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i></div>';
+
+            try {
+                const resp = await fetch('data/events.json');
+                const data = await resp.json();
+                const allEvents = data.events || data;
+
+                const invalid = allEvents.filter(e =>
+                    !e.date || e.date.includes('None') || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
+                );
+
+                document.getElementById('inboxCount').textContent = invalid.length;
+
+                if (invalid.length === 0) {
+                    container.innerHTML = `
+                        <div class="inbox-empty">
+                            <i class="fas fa-check-circle" style="color:#4caf50;"></i>
+                            <h2>All clear</h2>
+                            <p>No news items with missing dates or coordinates.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = `<div class="inbox-list">${
+                    invalid.map(e => {
+                        const cfg = categoryConfig[e.category] || categoryConfig.crime;
+                        const reason = getReason(e);
+                        const reasonClass = !e.date ? 'reason-date' : 'reason-coords';
+
+                        return `
+                            <div class="inbox-item">
+                                <div class="item-info">
+                                    <div class="item-place">
+                                        <i class="fas ${cfg.icon}" style="color:${cfg.color};width:16px;"></i>
+                                        ${e.place || 'Unknown place'}
+                                    </div>
+                                    <div class="item-meta">
+                                        ${e.publication_date ? formatDate(e.publication_date) : '—'}
+                                        ${e.newspaper ? ' · ' + e.newspaper : ''}
+                                        <span class="reason ${reasonClass}"><i class="fas fa-exclamation-triangle"></i> ${reason}</span>
+                                    </div>
+                                </div>
+                                <div class="item-actions">
+                                    <button class="btn-validate-item" onclick="openInboxValidation('${e.url ? e.url.replace(/'/g, "\\'") : ''}')">
+                                        <i class="fas fa-clipboard-check"></i> Validate
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')
+                }</div>`;
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="inbox-empty">
+                        <i class="fas fa-exclamation-triangle" style="color:#f44336;"></i>
+                        <h2>Error loading data</h2>
+                        <p>${err.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        window.openInboxValidation = function(url) {
+            if (!url) return;
+            fetch('data/events.json')
+                .then(r => r.json())
+                .then(data => {
+                    const allEvents = data.events || data;
+                    const event = allEvents.find(e => e.url === url);
+                    if (event) {
+                        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
+                        window.location.href = 'validation.html';
+                    }
+                })
+                .catch(console.error);
+        };
+
+        document.addEventListener('DOMContentLoaded', loadInbox);
+    </script>
+</body>
+</html>
