@@ -271,6 +271,15 @@
             return state;
         }
 
+        function allFieldsValidated() {
+            const fields = document.querySelectorAll('.validation-field');
+            for (const el of fields) {
+                const activeBtn = el.querySelector('.field-status button[class*="active-"]');
+                if (!activeBtn) return false;
+            }
+            return true;
+        }
+
         function updateProgress() {
             const fields = document.querySelectorAll('.validation-field');
             const total = fields.length;
@@ -283,6 +292,13 @@
             const pct = Math.round((done / total) * 100);
             document.getElementById('progressFill').style.width = pct + '%';
             document.getElementById('progressText').textContent = `${done} / ${total} fields validated`;
+
+            const saveBtn = document.querySelector('.btn-save-validation');
+            if (saveBtn) {
+                saveBtn.disabled = done < total;
+                saveBtn.style.opacity = done < total ? '0.5' : '1';
+                saveBtn.style.cursor = done < total ? 'not-allowed' : 'pointer';
+            }
         }
 
         function render() {
@@ -357,6 +373,11 @@
         async function saveValidation() {
             const event = getEvent();
             if (!event) return;
+
+            if (!allFieldsValidated()) {
+                showNotification('Please validate all fields before saving.', 'error');
+                return;
+            }
 
             const fields = getFieldsState();
 
