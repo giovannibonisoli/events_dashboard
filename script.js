@@ -88,7 +88,7 @@ function getFallbackEvents() {
         // Inserisci qui alcuni eventi di esempio
         {
             category: "crime",
-            place: "Via Giuseppe Coppola, Modena",
+            extracted_place: "Via Giuseppe Coppola, Modena",
             coordinates: { lat: 44.651368, lng: 10.895358 },
             date: "2026-01-12",
             key_info: {
@@ -361,8 +361,8 @@ function updateMarkers(filteredEvents, keyword) {
         const eventUrl = event.url ? event.url.replace(/'/g, "\\'") : '';
         marker.bindPopup(`
             <div style="min-width:220px;">
-                <b style="font-size:15px;color:#0d1321;">${hl(event.place, keyword)}</b><br>
-                <span style="color:#666;font-size:12px;">${formatDate(event.date)}</span><br>
+                <b style="font-size:15px;color:#0d1321;">${hl(event.geocoded_place, keyword)}</b><br>
+                <span style="color:#666;font-size:12px;">${formatDate(event.start_date)}</span><br>
                 <span style="display:inline-block;padding:2px 10px;border-radius:12px;background:${config.color}22;color:${config.color};font-weight:600;font-size:11px;margin-top:5px;">
                     <i class="fas ${config.icon}"></i> ${categoryLabel}
                 </span>
@@ -421,10 +421,10 @@ function applyFilters() {
 
     let filtered = events.filter(e => {
         if (!e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null) return false;
-        if (!e.date || e.date.includes('None')) return false;
-        
-        if (startDate && e.date < startDate) return false;
-        if (endDate && e.date > endDate) return false;
+        if (!e.start_date || (typeof e.start_date === 'object' && e.start_date.year == null)) return false;
+        const eDate = dateToComparable(e.start_date);
+        if (startDate && eDate < startDate) return false;
+        if (endDate && eDate > endDate) return false;
         
         if (selectedCategories.length > 0) {
             if (!selectedCategories.includes(e.category)) return false;
@@ -486,7 +486,7 @@ function updateEventsList(filteredEvents) {
         return;
     }
 
-    filteredEvents = [...filteredEvents].sort((a, b) => b.date.localeCompare(a.date));
+    filteredEvents = [...filteredEvents].sort((a, b) => dateToComparable(b.start_date).localeCompare(dateToComparable(a.start_date)));
 
     const keyword = (document.getElementById('keywordSearch').value || '').trim();
 
@@ -508,9 +508,9 @@ function updateEventsList(filteredEvents) {
                     <div onclick="zoomToEvent(${e.coordinates.lat}, ${e.coordinates.lng})">
                         <div class="event-title">
                             <i class="fas ${config.icon}" style="color:${config.color};width:16px;"></i>
-                            ${hl(e.place, keyword)}
+                            ${hl(e.geocoded_place, keyword)}
                         </div>
-                        <div class="event-date">${formatDate(e.date)}</div>
+                        <div class="event-date">${formatDate(e.start_date)}</div>
                         <span class="event-type ${config.key}">
                             <i class="fas ${config.icon}"></i> ${categoryLabel}
                         </span>
@@ -565,7 +565,7 @@ function updateInboxBadge() {
     const badge = document.getElementById('inboxBadge');
     if (!badge) return;
     const count = events.filter(e =>
-        !e.date || e.date.includes('None') || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
+        !e.start_date || (typeof e.start_date === 'object' && e.start_date.year == null) || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
     ).length;
     badge.textContent = count;
 }
@@ -580,9 +580,29 @@ function openValidation(btn) {
     }
 }
 
-function formatDate(dateStr) {
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
+function formatDate(d) {
+    if (!d) return '';
+    if (typeof d === 'object' && d.year) {
+        const y = d.year, m = String(d.month || 1).padStart(2, '0'), day = String(d.day || 1).padStart(2, '0');
+        return `${day}/${m}/${y}`;
+    }
+    if (typeof d === 'string') {
+        const [year, month, day] = d.split('-');
+        return `${day}/${month}/${year}`;
+    }
+    return String(d);
+}
+
+function dateToComparable(d) {
+    if (!d) return '';
+    if (typeof d === 'object' && d.year && d.year !== null) {
+        const y = String(d.year).padStart(4, '0');
+        const m = String(d.month || 1).padStart(2, '0');
+        const day = String(d.day || 1).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    if (typeof d === 'string') return d;
+    return '';
 }
 
 function zoomToEvent(lat, lng) {

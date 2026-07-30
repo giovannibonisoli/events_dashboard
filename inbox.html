@@ -87,14 +87,21 @@
             'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' }
         };
 
-        function formatDate(dateStr) {
-            if (!dateStr) return '';
-            const [y, m, d] = dateStr.split('-');
-            return `${d}/${m}/${y}`;
+        function formatDate(d) {
+            if (!d) return '';
+            if (typeof d === 'object' && d.year) {
+                const y = d.year, m = String(d.month || 1).padStart(2, '0'), day = String(d.day || 1).padStart(2, '0');
+                return `${day}/${m}/${y}`;
+            }
+            if (typeof d === 'string') {
+                const [y, m, day] = d.split('-');
+                return `${day}/${m}/${y}`;
+            }
+            return String(d);
         }
 
         function getReason(event) {
-            if (!event.date || event.date.includes('None')) return 'INVALID DATE: ' + (event.date || 'null');
+            if (!event.start_date || (typeof event.start_date === 'object' && event.start_date.year == null)) return 'INVALID DATE: ' + JSON.stringify(event.start_date);
             if (!event.coordinates || event.coordinates.lat == null || event.coordinates.lng == null) return 'MISSING COORDINATES';
             return '';
         }
@@ -109,7 +116,7 @@
                 const allEvents = data.events || data;
 
                 const invalid = allEvents.filter(e =>
-                    !e.date || e.date.includes('None') || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
+                    !e.start_date || (typeof e.start_date === 'object' && e.start_date.year == null) || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
                 );
 
                 document.getElementById('inboxCount').textContent = invalid.length;
@@ -136,7 +143,7 @@
                                 <div class="item-info">
                                     <div class="item-place">
                                         <i class="fas ${cfg.icon}" style="color:${cfg.color};width:16px;"></i>
-                                        ${e.place || 'Unknown place'}
+                                        ${e.geocoded_place || e.extracted_place || 'Unknown place'}
                                     </div>
                                     <div class="item-meta">
                                         ${e.publication_date ? formatDate(e.publication_date) : '—'}

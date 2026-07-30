@@ -1,0 +1,251 @@
+[
+  {
+    "url": "https://www.iltirreno.it/cecina/cronaca/2026/07/20/news/bibbona-sbanda-e-finisce-contro-un-albero-grave-una-64enne-1.100897198",
+    "date": {
+      "day": 20,
+      "month": 7,
+      "year": 2026
+    },
+    "place": "Bibbona",
+    "category": "accidents",
+    "newspaper": "iltirreno",
+    "fields": {
+      "is_event": {
+        "status": "correct",
+        "correction": null
+      },
+      "category": {
+        "status": "correct",
+        "correction": null
+      },
+      "start_date.day": {
+        "status": "correct",
+        "correction": null
+      },
+      "start_date.month": {
+        "status": "correct",
+        "correction": null
+      },
+      "start_date.year": {
+        "status": "correct",
+        "correction": null
+      },
+      "end_date.day": {
+        "status": "correct",
+        "correction": null
+      },
+      "end_date.month": {
+        "status": "correct",
+        "correction": null
+      },
+      "end_date.year": {
+        "status": "correct",
+        "correction": null
+      },
+      "extracted_place": {
+        "status": "correct",
+        "correction": null
+      },
+      "county": {
+        "status": "correct",
+        "correction": null
+      },
+      "street": {
+        "status": "correct",
+        "correction": null
+      },
+      "loc_description": {
+        "status": "correct",
+        "correction": null
+      },
+      "key_info.vittima": {
+        "status": "correct",
+        "correction": null
+      },
+      "key_info.infortunio": {
+        "status": "correct",
+        "correction": null
+      },
+      "key_info.mezzo": {
+        "status": "correct",
+        "correction": null
+      },
+      "key_info.luogo": {
+        "status": "correct",
+        "correction": null
+      },
+      "key_info.interventi": {
+        "status": "correct",
+        "correction": null
+      }
+    },
+    "validated_at": "2026-07-30T10:31:47.450Z"
+  },
+  {
+    "url": "https://www.anconatoday.it/eventi/serra-san-quirico-paese-dei-balocchi-pinocchio-luglio-2026.html",
+    "date": {
+      "day": 23,
+      "month": 7,
+      "year": 2026
+    },
+    "place": "Serra San Quirico",
+    "category": "culture",
+    "newspaper": "anconatoday",
+    "fields": {
+      "is_event": {
+        "status": "correct",
+        "correction": null
+      },
+      "category": {
+        "status": "correct",
+        "correction": null
+      },
+      "start_date.day": {
+        "status": "correct",
+        "correction": null
+      },
+      "start_date.month": {
+        "status": "correct",
+        "correction": null
+      },
+      "start_date.year": {
+        "status": "correct",
+        "correction": null
+      },
+      "end_date.day": {
+        "status": "correct",
+        "correction": null
+      },
+      "end_date.month": {
+        "status": "correct",
+        "correction": null
+      },
+      "end_date.year": {
+        "status": "correct",
+        "correction": null
+      },
+      "extracted_place": {
+        "status": "correct",
+        "correction": null
+      },
+      "county": {
+        "status": "correct",
+        "correction": null
+      },
+      "street": {
+        "status": "correct",
+        "correction": null
+      },
+      "loc_description": {
+        "status": "correct",
+        "correction": null
+      },
+      "coordinates.lat": {
+        "status": "correct",
+        "correction": null
+      },
+      "coordinates.lng": {
+        "status": "correct",
+        "correction": null
+      },
+      "osm_type": {
+        "status": "correct",
+        "correction": null
+      },
+      "osm_id": {
+        "status": "correct",
+        "correction": null
+      },
+      "key_info.organizzatore": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.data_inizio": {
+        "status": "deleted",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": true
+      },
+      "key_info.data_fine": {
+        "status": "deleted",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": true
+      },
+      "key_info.luogo": {
+        "status": "deleted",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": true
+      },
+      "key_info.descrizione": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.attività": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.partecipanti": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.biglietto": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.accesso": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.spettacoli": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.festival": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.promotore": {
+        "status": "correct",
+        "correction": null,
+        "corrected_key": null,
+        "deleted": false
+      },
+      "key_info.sostegno": {
+        "status": "wrong",
+        "correction": "Ministero della Cultura, Regione Marche",
+        "corrected_key": "sostegno istituzionale",
+        "deleted": false
+      },
+      "_added_key_info": [
+        {
+          "key": "altri luoghi",
+          "value": "Arena del teatro"
+        }
+      ],
+      "multi_event": {
+        "status": "yes",
+        "correction": "yes"
+      }
+    },
+    "notes": "",
+    "validated_at": "2026-07-30T16:46:02.232Z"
+  }
+]

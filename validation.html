@@ -43,12 +43,60 @@
         }
 
         .validation-fields { display: flex; flex-direction: column; gap: 8px; }
+        .section-header {
+            font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+            color: var(--text-muted); padding: 16px 0 4px 0;
+            border-bottom: 1px solid var(--border); margin-bottom: 4px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .multi-event-check {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px 18px; margin-bottom: 4px;
+        }
+        .multi-event-radio {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 18px; margin-bottom: 4px;
+        }
+        .multi-event-radio .radio-group {
+            display: flex; gap: 8px;
+        }
+        .multi-event-radio .radio-group label {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 500; color: var(--text);
+            border: 1.5px solid var(--border); transition: all .2s;
+        }
+        .multi-event-radio .radio-group label:first-of-type {
+            color: #2e7d32; border-color: #4caf50;
+        }
+        .multi-event-radio .radio-group label:first-of-type:hover {
+            background: #4caf50; color: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(76,175,80,.3);
+        }
+        .multi-event-radio .radio-group label:last-of-type {
+            color: #c62828; border-color: #f44336;
+        }
+        .multi-event-radio .radio-group label:last-of-type:hover {
+            background: #f44336; color: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(244,67,54,.3);
+        }
+        .multi-event-radio .radio-group label.selected:first-of-type {
+            background: #4caf50; color: #fff; border-color: #4caf50;
+        }
+        .multi-event-radio .radio-group label.selected:last-of-type {
+            background: #f44336; color: #fff; border-color: #f44336;
+        }
+        .multi-event-radio .radio-group input[type="radio"] {
+            display: none;
+        }
+        .multi-event-radio .field-name {
+            font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+            font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+        }
         .validation-field {
             background: var(--bg-card); border: 1px solid var(--border);
             border-radius: 10px; padding: 14px 18px;
             transition: border-color .2s;
         }
-        .validation-field.status-incomplete { border-color: #ff9800; }
         .validation-field.status-wrong { border-color: #f44336; }
         .validation-field.status-correct { border-color: #4caf50; }
         .validation-field .field-row {
@@ -79,9 +127,6 @@
         .validation-field .field-status button:hover { background: var(--bg-hover); }
         .validation-field .field-status button.active-correct {
             background: #4caf50; color: #fff; border-color: #4caf50;
-        }
-        .validation-field .field-status button.active-incomplete {
-            background: #ff9800; color: #fff; border-color: #ff9800;
         }
         .validation-field .field-status button.active-wrong {
             background: #f44336; color: #fff; border-color: #f44336;
@@ -137,6 +182,41 @@
             font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
             font-family: 'IBM Plex Mono', monospace;
         }
+        .ki-row {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 12px 16px;
+            transition: border-color .2s;
+        }
+        .ki-row.status-wrong { border-color: #f44336; }
+        .ki-row.status-correct { border-color: #4caf50; }
+        .ki-row.status-deleted { border-color: #757575; opacity: .5; }
+        .ki-row .ki-inputs { display: flex; gap: 8px; flex: 1; align-items: center; }
+        .ki-row .ki-inputs input {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; padding: 6px 10px; font-size: 13px;
+            color: var(--text); font-family: inherit;
+        }
+        .ki-row .ki-inputs input:disabled { opacity: .6; }
+        .ki-row .ki-inputs input.ki-key { width: 160px; flex-shrink: 0; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; }
+        .ki-row .ki-inputs input.ki-value { flex: 1; }
+        .ki-row .ki-status { display: flex; gap: 3px; flex-shrink: 0; }
+        .ki-row .ki-status button {
+            width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid var(--border);
+            background: var(--bg); cursor: pointer; color: var(--text-muted);
+            display: flex; align-items: center; justify-content: center; transition: all .2s;
+        }
+        .ki-row .ki-status button:hover { background: var(--bg-hover); }
+        .ki-row .ki-status button.active-correct { background: #4caf50; color: #fff; border-color: #4caf50; }
+        .ki-row .ki-status button.active-wrong { background: #f44336; color: #fff; border-color: #f44336; }
+        .ki-row .ki-status button.active-deleted { background: #757575; color: #fff; border-color: #757575; }
+        .ki-row .ki-status button.btn-delete:hover { background: #f44336; color: #fff; border-color: #f44336; }
+        .ki-add-btn {
+            display: flex; align-items: center; gap: 6px; padding: 10px 16px;
+            background: var(--bg-card); border: 1.5px dashed var(--border);
+            border-radius: 10px; color: var(--text-muted); cursor: pointer;
+            font-size: 13px; transition: all .2s; justify-content: center;
+        }
+        .ki-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-hover); }
     </style>
 </head>
 <body>
@@ -173,10 +253,17 @@
             }
         }
 
-        function formatDate(dateStr) {
-            if (!dateStr) return '';
-            const [y, m, d] = dateStr.split('-');
-            return `${d}/${m}/${y}`;
+        function formatDate(d) {
+            if (!d) return '';
+            if (typeof d === 'object' && d.year) {
+                const y = d.year, m = String(d.month || 1).padStart(2, '0'), day = String(d.day || 1).padStart(2, '0');
+                return `${day}/${m}/${y}`;
+            }
+            if (typeof d === 'string') {
+                const [y, m, day] = d.split('-');
+                return `${day}/${m}/${y}`;
+            }
+            return String(d);
         }
 
         function renderValue(val) {
@@ -192,7 +279,15 @@
         }
 
         function renderField(name, value, savedState) {
-            const displayName = name.replace(/^key_info\./, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const isDatePart = name.match(/^(start_date|end_date)\.(day|month|year)$/);
+            let displayName;
+            if (isDatePart) {
+                const datePrefix = isDatePart[1] === 'start_date' ? 'Start Date' : 'End Date';
+                const partLabel = isDatePart[2].charAt(0).toUpperCase() + isDatePart[2].slice(1);
+                displayName = datePrefix + ' › ' + partLabel;
+            } else {
+                displayName = name.replace(/^key_info\./, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            }
             const isNull = value === null || value === undefined || value === '';
             const savedStatus = savedState?.status || '';
             const correction = savedState?.correction || '';
@@ -201,31 +296,117 @@
 
             const hasStatus = savedStatus ? 'status-' + savedStatus : '';
 
+            const displayValue = name === 'category'
+                ? (categoryConfig[value] ? categoryConfig[value].label : value)
+                : (isDatePart && isNull) ? 'None'
+                : value;
+
+            let correctionHtml = '';
+            if (name === 'is_event' || name === 'multi_event') {
+                correctionHtml = '';
+            } else if (name === 'category') {
+                const currentVal = typeof value === 'string' ? value : '';
+                const catOptions = Object.keys(categoryConfig).filter(k => k !== currentVal);
+                const selectedCorrection = (savedStatus === 'wrong' && correction) ? correction : '';
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <select class="correction-category" onchange="toggleCategoryOther(this)">
+                            <option value="">— Select category —</option>
+                            ${catOptions.map(k => `<option value="${k}" ${selectedCorrection === k ? 'selected' : ''}>${categoryConfig[k].label}</option>`).join('')}
+                            <option value="__other__" ${selectedCorrection && !catOptions.includes(selectedCorrection) ? 'selected' : ''}>Other</option>
+                        </select>
+                        <input type="text" class="correction-category-other" placeholder="Specify custom category..." style="${selectedCorrection && !catOptions.includes(selectedCorrection) ? 'display:block;margin-top:6px;' : 'display:none;margin-top:6px;'}" value="${selectedCorrection && !catOptions.includes(selectedCorrection) ? selectedCorrection.replace(/"/g, '&quot;') : ''}">
+                    </div>
+                `;
+            } else if (isDatePart) {
+                const part = isDatePart[2];
+                const attrs = part === 'year' ? 'min="1900" max="2100" style="width:100px;"' :
+                              part === 'month' ? 'min="1" max="12" style="width:80px;"' :
+                              'min="1" max="31" style="width:80px;"';
+                const isNone = correction === '__none__';
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input type="number" ${attrs} placeholder="${part}" value="${isNone ? '' : String(correction ?? value ?? '')}" class="correction-date-input">
+                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleDateNone(this)"> None
+                            </label>
+                        </div>
+                    </div>
+                `;
+            } else if (name === 'osm_type') {
+                const osmOptions = ['node', 'way', 'relation'];
+                const selectedCorrection = (savedStatus === 'wrong' && correction) ? correction : '';
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <select class="correction-osm-type">
+                            <option value="">— Select OSM type —</option>
+                            ${osmOptions.map(k => `<option value="${k}" ${selectedCorrection === k ? 'selected' : ''}>${k}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            } else if (name === 'osm_id') {
+                const osmIdVal = (savedStatus === 'wrong' && correction) ? String(correction) : '';
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <input type="number" step="1" min="0" class="correction-osm-id" placeholder="OSM ID" value="${osmIdVal.replace(/"/g, '&quot;')}">
+                    </div>
+                `;
+            } else {
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <input type="text" placeholder="Enter the correct value..." value="${correction.replace(/"/g, '&quot;')}">
+                    </div>
+                `;
+            }
+
             return `
                 <div class="validation-field ${hasStatus}" data-field="${name}">
                     <div class="field-row">
                         <div class="field-info">
                             <div class="field-name">${prefix}${displayName}</div>
-                            <div class="field-value ${isNull ? 'null-value' : ''}">${renderValue(value)}</div>
+                            <div class="field-value ${isNull ? 'null-value' : ''}">${renderValue(displayValue)}</div>
                         </div>
                         <div class="field-status">
                             <button type="button" class="${savedStatus === 'correct' ? 'active-correct' : ''}" data-status="correct" title="Correct" onclick="setFieldStatus(this, '${name}')">
                                 <i class="fas fa-check"></i>
                             </button>
-                            <button type="button" class="${savedStatus === 'incomplete' ? 'active-incomplete' : ''}" data-status="incomplete" title="Incomplete" onclick="setFieldStatus(this, '${name}')">
-                                <i class="fas fa-edit"></i>
-                            </button>
                             <button type="button" class="${savedStatus === 'wrong' ? 'active-wrong' : ''}" data-status="wrong" title="Wrong" onclick="setFieldStatus(this, '${name}')">
-                                <i class="fas fa-times"></i>
+                                <i class="fas fa-edit"></i>
                             </button>
                         </div>
                     </div>
-                    <div class="field-correction ${(savedStatus === 'incomplete' || savedStatus === 'wrong') ? 'show' : ''}">
-                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
-                        <input type="text" placeholder="Enter the correct value..." value="${correction.replace(/"/g, '&quot;')}">
-                    </div>
+                    ${correctionHtml}
                 </div>
             `;
+        }
+
+        function onMultiEventChange(input) {
+            const labels = input.closest('.radio-group').querySelectorAll('label');
+            labels.forEach(l => l.classList.remove('selected'));
+            input.closest('label').classList.add('selected');
+            updateProgress();
+        }
+
+        function toggleDateNone(checkbox) {
+            const input = checkbox.closest('.field-correction').querySelector('.correction-date-input');
+            if (input) {
+                input.disabled = checkbox.checked;
+                if (checkbox.checked) input.value = '';
+            }
+        }
+
+        function toggleCategoryOther(select) {
+            const otherInput = select.parentElement.querySelector('.correction-category-other');
+            if (otherInput) {
+                otherInput.style.display = select.value === '__other__' ? 'block' : 'none';
+                if (select.value === '__other__') otherInput.focus();
+            }
         }
 
         function setFieldStatus(btn, fieldName) {
@@ -238,23 +419,94 @@
             btn.classList.add('active-' + status);
             field.className = 'validation-field status-' + status;
 
-            const correction = field.querySelector('.field-correction');
-            if (status === 'incomplete' || status === 'wrong') {
-                correction.classList.add('show');
-                correction.querySelector('input, textarea')?.focus();
-            } else {
-                correction.classList.remove('show');
+            const correction = field.querySelector('.field-correction, .correction-input');
+            if (correction) {
+                if (status === 'wrong') {
+                    correction.style.display = 'block';
+                    correction.classList.add('show');
+                    const input = correction.querySelector('input, textarea, select');
+                    if (input) input.focus();
+                } else {
+                    correction.style.display = 'none';
+                    correction.classList.remove('show');
+                }
             }
             updateProgress();
         }
 
+        function setKIStatus(btn) {
+            const row = btn.closest('.ki-row');
+            const status = btn.dataset.status;
+            const isActive = btn.classList.contains('active-' + status);
+
+            if (isActive) {
+                // toggle off — roll back to no status
+                btn.classList.remove('active-' + status);
+                row.className = 'ki-row';
+                row.querySelectorAll('input').forEach(inp => inp.disabled = false);
+            } else {
+                // clear all active states on this row
+                row.querySelectorAll('.ki-status button[data-status]').forEach(b => {
+                    b.className = b.classList.contains('btn-delete') ? 'btn-delete' : '';
+                });
+                btn.classList.add('active-' + status);
+                row.className = 'ki-row status-' + status;
+                const disabled = status === 'correct' || status === 'deleted';
+                if (status === 'correct') {
+                    // revert to original values
+                    const origKey = row.dataset.origKey || '';
+                    const origVal = row.dataset.origVal || '';
+                    const keyInput = row.querySelector('.ki-key');
+                    const valInput = row.querySelector('.ki-value');
+                    if (keyInput) keyInput.value = origKey;
+                    if (valInput) valInput.value = origVal;
+                }
+                row.querySelectorAll('input').forEach(inp => inp.disabled = disabled);
+                if (status === 'wrong') {
+                    row.querySelector('.ki-key')?.focus();
+                }
+            }
+            updateProgress();
+        }
+
+        window.addKIField = function() {
+            const container = document.querySelector('.validation-fields');
+            const addBtn = container.querySelector('.ki-add-btn');
+            const row = document.createElement('div');
+            row.className = 'ki-row';
+            row.dataset.kiField = 'key_info.__new_' + Date.now();
+            row.dataset.added = '1';
+            row.innerHTML =
+                '<div style="display:flex;align-items:center;gap:8px;">' +
+                '  <div class="ki-inputs">' +
+                '    <input type="text" class="ki-key" placeholder="Key" style="width:160px;flex-shrink:0;font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:600;">' +
+                '    <input type="text" class="ki-value" placeholder="Value" style="flex:1;">' +
+                '  </div>' +
+                '  <button type="button" class="btn-delete" title="Remove" onclick="this.closest(\'.ki-row\').remove();updateProgress();" style="width:32px;height:32px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-times"></i></button>' +
+                '</div>';
+            container.insertBefore(row, addBtn);
+            row.querySelector('.ki-key').focus();
+            updateProgress();
+        };
+
+        function getDateParts(event) {
+            const parts = [];
+            for (const prefix of ['start_date', 'end_date']) {
+                for (const part of ['day', 'month', 'year']) {
+                    parts.push(prefix + '.' + part);
+                }
+            }
+            return parts;
+        }
+
         function getAllFieldNames(event) {
+            const dateParts = getDateParts(event);
             const metaFields = [
-                'date', 'is_event', 'category', 'place',
-                'county', 'street', 'loc_description', 'end_date'
+                'is_event', 'category', 'extracted_place',
+                'county', 'street', 'loc_description'
             ];
             const keyInfoFields = Object.keys(event.key_info || {}).map(k => 'key_info.' + k);
-            return [...metaFields, ...keyInfoFields];
+            return [...dateParts, ...metaFields, ...keyInfoFields];
         }
 
         function getFieldsState() {
@@ -264,10 +516,107 @@
                 const activeBtn = el.querySelector('.field-status button[class*="active-"]');
                 if (!activeBtn) return;
                 const status = activeBtn.dataset.status;
-                const correctionInput = el.querySelector('.field-correction input, .field-correction textarea');
-                const correction = correctionInput?.value?.trim() || '';
-                state[name] = { status, correction: correction || null };
+
+                let correction = null;
+                if (name === 'is_event' && status === 'wrong') {
+                    const event = getEvent();
+                    correction = event && event.is_event === true ? 'false' : 'true';
+                } else if (name === 'category' && status === 'wrong') {
+                    const catSelect = el.querySelector('.correction-category');
+                    if (catSelect && catSelect.value) {
+                        if (catSelect.value === '__other__') {
+                            const otherInput = el.querySelector('.correction-category-other');
+                            correction = otherInput?.value?.trim() || '__other__';
+                        } else {
+                            correction = catSelect.value;
+                        }
+                    }
+                } else if (name.match(/^(start_date|end_date)\.(day|month|year)$/) && status === 'wrong') {
+                    const noneCheck = el.querySelector('.correction-none-check');
+                    if (noneCheck?.checked) {
+                        correction = '__none__';
+                    } else {
+                        const numInput = el.querySelector('.correction-date-input');
+                        const val = numInput?.value?.trim();
+                        correction = val || null;
+                    }
+                } else if (name === 'osm_type' && status === 'wrong') {
+                    const sel = el.querySelector('.correction-osm-type');
+                    const v = sel?.value?.trim();
+                    correction = v || null;
+                } else {
+                    const correctionInput = el.querySelector('.field-correction input, .field-correction textarea');
+                    const val = correctionInput?.value?.trim() || '';
+                    correction = val || null;
+                }
+
+                state[name] = { status, correction };
             });
+
+            // Collect key info rows
+            const addedFields = [];
+            document.querySelectorAll('.ki-row').forEach(row => {
+                const fieldName = row.dataset.kiField || '';
+                const keyInput = row.querySelector('.ki-key');
+                const valInput = row.querySelector('.ki-value');
+                const key = keyInput?.value?.trim() || '';
+                const value = valInput?.value?.trim() || '';
+                const isAdded = row.dataset.added === '1';
+                if (isAdded) {
+                    if (key) addedFields.push({ key, value });
+                    return;
+                }
+                const activeBtn = row.querySelector('.ki-status button[class*="active-"]');
+                const deleted = row.classList.contains('status-deleted');
+                if (deleted) {
+                    if (fieldName && !fieldName.includes('__new_')) {
+                        state[fieldName] = { status: 'deleted', correction: null, corrected_key: null, deleted: true };
+                    }
+                    return;
+                }
+                if (!activeBtn) return;
+                const status = activeBtn.dataset.status;
+                if (status === 'correct') {
+                    if (fieldName && !fieldName.includes('__new_')) {
+                        state[fieldName] = { status: 'correct', correction: null, corrected_key: null, deleted: false };
+                    } else if (fieldName && fieldName.includes('__new_')) {
+                        if (key) addedFields.push({ key, value });
+                    }
+                } else if (status === 'wrong') {
+                    if (fieldName && !fieldName.includes('__new_')) {
+                        const correctedKey = key !== fieldName.replace('key_info.', '') ? key : null;
+                        state[fieldName] = { status: 'wrong', correction: value || null, corrected_key: correctedKey, deleted: false };
+                    } else if (fieldName && fieldName.includes('__new_')) {
+                        if (key) addedFields.push({ key, value });
+                    }
+                }
+            });
+            if (addedFields.length > 0) {
+                state['_added_key_info'] = addedFields;
+            }
+
+            // Vincolate coordinates.lat + coordinates.lng into a single coordinates object
+            const lat = state['coordinates.lat'];
+            const lng = state['coordinates.lng'];
+            if (lat && lng && lat.correction && lng.correction) {
+                state['coordinates'] = {
+                    status: 'wrong',
+                    correction: { lat: parseFloat(lat.correction), lng: parseFloat(lng.correction) }
+                };
+                delete state['coordinates.lat'];
+                delete state['coordinates.lng'];
+            } else if (lat && lat.correction) {
+                delete state['coordinates.lat'];
+            } else if (lng && lng.correction) {
+                delete state['coordinates.lng'];
+            }
+
+            // Handle multi_event radio (not a .validation-field)
+            const multiRadio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
+            if (multiRadio) {
+                state['multi_event'] = { status: multiRadio.value, correction: multiRadio.value };
+            }
+
             return state;
         }
 
@@ -277,18 +626,34 @@
                 const activeBtn = el.querySelector('.field-status button[class*="active-"]');
                 if (!activeBtn) return false;
             }
+            const kiRows = document.querySelectorAll('.ki-row:not([data-added="1"])');
+            for (const row of kiRows) {
+                if (row.classList.contains('status-deleted')) continue;
+                const activeBtn = row.querySelector('.ki-status button[class*="active-"]');
+                if (!activeBtn) return false;
+            }
+            const multiRadio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
+            if (!multiRadio) return false;
             return true;
         }
 
         function updateProgress() {
             const fields = document.querySelectorAll('.validation-field');
-            const total = fields.length;
+            const kiRows = document.querySelectorAll('.ki-row:not([data-added="1"])');
+            const multiRadio = document.querySelector('.multi-event-radio');
+            const total = fields.length + kiRows.length + (multiRadio ? 1 : 0);
             if (total === 0) return;
             let done = 0;
             fields.forEach(el => {
                 const activeBtn = el.querySelector('.field-status button[class*="active-"]');
                 if (activeBtn) done++;
             });
+            kiRows.forEach(row => {
+                if (row.classList.contains('status-deleted')) { done++; return; }
+                const activeBtn = row.querySelector('.ki-status button[class*="active-"]');
+                if (activeBtn) done++;
+            });
+            if (multiRadio && multiRadio.querySelector('input[name="multi_event_radio"]:checked')) done++;
             const pct = Math.round((done / total) * 100);
             document.getElementById('progressFill').style.width = pct + '%';
             document.getElementById('progressText').textContent = `${done} / ${total} fields validated`;
@@ -321,6 +686,16 @@
 
             const cfg = categoryConfig[event.category] || categoryConfig.crime;
             const fields = getAllFieldNames(event);
+            const keyInfoFields = fields.filter(f => f.startsWith('key_info.'));
+
+            const groups = [
+                { label: '<i class="fas fa-tag"></i> General', keys: ['is_event', 'category', 'multi_event'] },
+                { label: '<i class="fas fa-calendar"></i> Start Date', keys: ['start_date.day', 'start_date.month', 'start_date.year'] },
+                { label: '<i class="fas fa-calendar-check"></i> End Date', keys: ['end_date.day', 'end_date.month', 'end_date.year'] },
+                { label: '<i class="fas fa-map-pin"></i> Location', keys: ['extracted_place', 'county', 'street', 'loc_description'] },
+                { label: '<i class="fas fa-globe"></i> Geolocation', keys: ['coordinates.lat', 'coordinates.lng', 'osm_type', 'osm_id'] },
+            ];
+            const totalFields = groups.reduce((s, g) => s + g.keys.length, 0) + keyInfoFields.length;
 
             const savedKey = 'validation_' + event.url;
             let savedState = null;
@@ -347,13 +722,101 @@
                     </div>
                 </div>
 
-                <div class="progress-text" id="progressText">0 / ${fields.length} fields validated</div>
+                <div class="progress-text" id="progressText">0 / ${totalFields} fields validated</div>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill" style="width:0%"></div>
                 </div>
 
                 <div class="validation-fields">
-                    ${fields.map(f => renderField(f, f.startsWith('key_info.') ? (event.key_info || {})[f.replace('key_info.', '')] : event[f], savedFields[f])).join('')}
+                    ${(() => {
+                        let html = '';
+                        for (const group of groups) {
+                            html += '<div class="section-header">' + group.label + '</div>';
+                            if (group.keys.includes('osm_type')) {
+                                const city = event.geocoded_city ? event.geocoded_city.split(',')[0].trim() : '—';
+                                html += '<div style="padding:8px 12px;font-size:13px;color:var(--text-muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;"><span style="font-weight:600;">Geocoded city</span><span>' + city + '</span></div>';
+                            }
+                            for (const f of group.keys) {
+                                let val;
+                                if (f === 'multi_event') {
+                                    const savedVal = savedFields[f];
+                                    const savedStatus = savedVal?.status || '';
+                                    html += '<div class="multi-event-radio">';
+                                    html += '  <div class="field-name" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Multi‑event</div>';
+                                    html += '  <div class="radio-group" data-field="multi_event">';
+                                    html += '    <label class="' + (savedStatus === 'yes' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="yes" ' + (savedStatus === 'yes' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-check-circle"></i> Yes</label>';
+                                    html += '    <label class="' + (savedStatus === 'no' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="no" ' + (savedStatus === 'no' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-times-circle"></i> No</label>';
+                                    html += '  </div>';
+                                    html += '</div>';
+                                    continue;
+                                }
+                                if (f.includes('.')) {
+                                    const [obj, key] = f.split('.');
+                                    val = event[obj] ? event[obj][key] : null;
+                                } else {
+                                    val = event[f];
+                                }
+                                html += renderField(f, val, savedFields[f]);
+                            }
+                        }
+                        // Key Info section — custom render with editable key, value, delete, and add-field
+                        html += '<div class="section-header"><i class="fas fa-info-circle"></i> Key Info</div>';
+                        const addedKIFields = savedState?._added_key_info || [];
+                        const allKIFields = keyInfoFields.map(f => {
+                            const key = f.replace('key_info.', '');
+                            return { field: f, key, original: true };
+                        });
+                        addedKIFields.forEach((item, i) => {
+                            allKIFields.push({ field: 'key_info.__new_' + Date.now() + '_' + i, key: item.key || '', value: item.value || '', original: false });
+                        });
+                        if (allKIFields.length === 0) {
+                            html += '<div style="padding:12px;font-size:13px;color:var(--text-muted);text-align:center;">No key info fields. Click "Add field" below.</div>';
+                        } else {
+                            allKIFields.forEach((item, _kiIdx) => {
+                                const f = item.field;
+                                const origKey = item.key;
+                                const origVal = item.original ? (event.key_info || {})[origKey] : (item.value || '');
+                                if (!item.original) {
+                                    html += '<div class="ki-row" data-ki-field="' + f + '" data-added="1">';
+                                    html += '  <div style="display:flex;align-items:center;gap:8px;">';
+                                    html += '    <div class="ki-inputs">';
+                                    html += '      <input type="text" class="ki-key" value="' + origKey.replace(/"/g, '&quot;') + '" placeholder="Key" style="width:160px;flex-shrink:0;font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:600;">';
+                                    html += '      <input type="text" class="ki-value" value="' + String(origVal ?? '').replace(/"/g, '&quot;') + '" placeholder="Value" style="flex:1;">';
+                                    html += '    </div>';
+                                    html += '    <button type="button" class="btn-delete" title="Remove field" onclick="this.closest(\'.ki-row\').remove();updateProgress();" style="width:32px;height:32px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-times"></i></button>';
+                                    html += '  </div>';
+                                    html += '</div>';
+                                    return;
+                                }
+                                const saved = savedFields[f] || {};
+                                const st = saved.status || '';
+                                const savedKey = (st === 'wrong' && saved.corrected_key) ? saved.corrected_key : origKey;
+                                const savedVal = (st === 'wrong' && saved.correction != null) ? saved.correction : origVal;
+                                const cls = st === 'deleted' ? 'ki-row status-deleted' : (st === 'correct' ? 'ki-row status-correct' : (st === 'wrong' ? 'ki-row status-wrong' : 'ki-row'));
+                                const dis = st === 'deleted' ? 'disabled' : '';
+                                html += '<div class="' + cls + '" data-ki-field="' + f + '" data-orig-key="' + origKey.replace(/"/g, '&quot;') + '" data-orig-val="' + String(origVal ?? '').replace(/"/g, '&quot;') + '">';
+                                html += '  <div style="display:flex;align-items:center;gap:8px;">';
+                                html += '    <div class="ki-inputs">';
+                                html += '      <input type="text" class="ki-key" value="' + savedKey.replace(/"/g, '&quot;') + '" placeholder="Key" ' + dis + '>';
+                                html += '      <input type="text" class="ki-value" value="' + String(savedVal ?? '').replace(/"/g, '&quot;') + '" placeholder="Value" ' + dis + '>';
+                                html += '    </div>';
+                                html += '    <div class="ki-status">';
+                                html += '      <button type="button" class="' + (st === 'correct' && st !== 'deleted' ? 'active-correct' : '') + '" data-status="correct" title="Correct" onclick="setKIStatus(this)"><i class="fas fa-check"></i></button>';
+                                html += '      <button type="button" class="' + (st === 'wrong' && st !== 'deleted' ? 'active-wrong' : '') + '" data-status="wrong" title="Wrong" onclick="setKIStatus(this)"><i class="fas fa-edit"></i></button>';
+                                html += '      <button type="button" class="' + (st === 'deleted' ? 'active-deleted' : 'btn-delete') + '" data-status="deleted" title="Delete" onclick="setKIStatus(this)"><i class="fas fa-trash"></i></button>';
+                                html += '    </div>';
+                                html += '  </div>';
+                                html += '</div>';
+                            });
+                        }
+                        html += '<button class="ki-add-btn" onclick="addKIField()"><i class="fas fa-plus"></i> Add field</button>';
+                        html += '<div style="margin-top:16px;">';
+                        html += '  <div class="section-header" style="border:none;padding-bottom:8px;"><i class="fas fa-comment"></i> Notes</div>';
+                        const notesVal = (savedState?.notes || '').replace(/"/g, '&quot;');
+                        html += '  <textarea id="validationNotes" placeholder="Add your free comments here..." style="width:100%;min-height:80px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;">' + notesVal + '</textarea>';
+                        html += '</div>';
+                        return html;
+                    })()}
                 </div>
 
                 <div class="validation-actions">
@@ -380,14 +843,16 @@
             }
 
             const fields = getFieldsState();
+            const notes = document.getElementById('validationNotes')?.value?.trim() || '';
 
             const validation = {
                 url: event.url,
-                date: event.date,
-                place: event.place,
+                date: event.start_date,
+                place: event.extracted_place,
                 category: event.category,
                 newspaper: event.newspaper,
                 fields: fields,
+                notes: notes,
                 validated_at: new Date().toISOString()
             };
 
