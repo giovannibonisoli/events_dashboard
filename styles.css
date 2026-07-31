@@ -351,6 +351,31 @@ body {
     color: white;
 }
 
+.validated-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #15803d;
+    background: #15803d14;
+    border: 1px solid #15803d44;
+    padding: 1px 7px;
+    border-radius: 10px;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.btn-validate.btn-modify {
+    color: #b45309;
+    border-color: #b45309;
+}
+
+.btn-validate.btn-modify:hover {
+    background: #b45309;
+    color: white;
+}
+
 .info-array-item {
     margin-bottom: 4px;
     padding: 4px 8px;

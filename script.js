@@ -61,6 +61,26 @@ const categoryConfig = {
 };
 
 let events = [];
+let validatedUrls = new Set();
+
+async function loadValidated() {
+    validatedUrls = new Set();
+    try {
+        const resp = await fetch('/api/validated-news');
+        if (resp.ok) {
+            const data = await resp.json();
+            (data || []).forEach(entry => {
+                if (entry && entry.url) validatedUrls.add(entry.url);
+            });
+        }
+    } catch (e) {
+        console.warn('Could not load validated news from server:', e);
+    }
+}
+
+function isValidated(url) {
+    return validatedUrls.has(url);
+}
 
 async function loadEvents() {
     try {
@@ -359,6 +379,12 @@ function updateMarkers(filteredEvents, keyword) {
         ` : '';
 
         const eventUrl = event.url ? event.url.replace(/'/g, "\\'") : '';
+        const popupDone = isValidated(event.url);
+        const popupLabel = popupDone ? (t.modifyValidation || 'Modify Validation') : (t.validate || 'Validate');
+        const popupIcon = popupDone ? 'fa-pen-to-square' : 'fa-clipboard-check';
+        const popupBadge = popupDone
+            ? `<div style="margin-top:6px;font-size:10.5px;font-weight:600;color:#15803d;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-check-circle"></i> ${t.validated || 'Validated'}</div>`
+            : '';
         marker.bindPopup(`
             <div style="min-width:220px;">
                 <b style="font-size:15px;color:#0d1321;">${hl(event.geocoded_place, keyword)}</b><br>
@@ -370,9 +396,10 @@ function updateMarkers(filteredEvents, keyword) {
                     ${renderInfoObject(event.key_info, keyword)}
                     ${urlHtml}
                 </div>
+                ${popupBadge}
                 <div style="margin-top:8px;border-top:1px solid #eee;padding-top:6px;text-align:center;">
-                    <button onclick="window.openValidationByUrl('${eventUrl}')" style="background:#15803d;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Outfit,sans-serif;display:inline-flex;align-items:center;gap:4px;">
-                        <i class="fas fa-clipboard-check"></i> Validate
+                    <button onclick="window.openValidationByUrl('${eventUrl}')" style="background:${popupDone ? '#b45309' : '#15803d'};color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Outfit,sans-serif;display:inline-flex;align-items:center;gap:4px;">
+                        <i class="fas ${popupIcon}"></i> ${popupLabel}
                     </button>
                 </div>
             </div>
@@ -503,12 +530,20 @@ function updateEventsList(filteredEvents) {
                 </div>
             ` : '';
             
+            const done = isValidated(e.url);
+            const validateLabel = done ? (t.modifyValidation || 'Modify Validation') : (t.validate || 'Validate');
+            const validateIcon = done ? 'fa-pen-to-square' : 'fa-clipboard-check';
+            const badgeHtml = done
+                ? `<div class="validated-badge"><i class="fas fa-check-circle"></i> ${t.validated || 'Validated'}</div>`
+                : '';
+
             return `
                 <div class="event-item" style="border-left-color:${config.color};">
                     <div onclick="zoomToEvent(${e.coordinates.lat}, ${e.coordinates.lng})">
                         <div class="event-title">
                             <i class="fas ${config.icon}" style="color:${config.color};width:16px;"></i>
                             ${hl(e.geocoded_place, keyword)}
+                            ${badgeHtml}
                         </div>
                         <div class="event-date">${formatDate(e.start_date)}</div>
                         <span class="event-type ${config.key}">
@@ -519,8 +554,8 @@ function updateEventsList(filteredEvents) {
                             ${urlHtml}
                         </div>
                     </div>
-                    <button class="btn-validate" data-url="${e.url.replace(/"/g, '&quot;')}" onclick="event.stopPropagation(); openValidation(this)" title="Validate annotation">
-                        <i class="fas fa-clipboard-check"></i> Validate
+                    <button class="btn-validate ${done ? 'btn-modify' : ''}" data-url="${e.url.replace(/"/g, '&quot;')}" onclick="event.stopPropagation(); openValidation(this)" title="${done ? 'Modify validation' : 'Validate annotation'}">
+                        <i class="fas ${validateIcon}"></i> ${validateLabel}
                     </button>
                 </div>
             `;
@@ -560,6 +595,16 @@ window.openValidationByUrl = function(url) {
         window.location.href = 'validation.html';
     }
 };
+
+function openValidation(btn) {
+    const url = btn.dataset.url;
+    if (!url) return;
+    const event = events.find(e => e.url === url);
+    if (event) {
+        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
+        window.location.href = 'validation.html';
+    }
+}
 
 function updateInboxBadge() {
     const badge = document.getElementById('inboxBadge');
@@ -676,6 +721,7 @@ function clearSelectedArea() {
 window.onload = async function() {
     // 1. Prima carica gli eventi
     await loadEvents();
+    await loadValidated();
     
     // 2. Imposta le date (PRIMA di inizializzare la mappa)
     const today = new Date();

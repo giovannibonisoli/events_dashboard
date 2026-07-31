@@ -110,6 +110,15 @@
             const container = document.getElementById('inboxContent');
             container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i></div>';
 
+            let validatedSet = new Set();
+            try {
+                const vResp = await fetch('/api/validated-news');
+                if (vResp.ok) {
+                    const vList = await vResp.json();
+                    (vList || []).forEach(x => { if (x && x.url) validatedSet.add(x.url); });
+                }
+            } catch (e) {}
+
             try {
                 const resp = await fetch('data/events.json');
                 const data = await resp.json();
@@ -137,6 +146,12 @@
                         const cfg = categoryConfig[e.category] || categoryConfig.crime;
                         const reason = getReason(e);
                         const reasonClass = !e.date ? 'reason-date' : 'reason-coords';
+                        const done = e.url && validatedSet.has(e.url);
+                        const btnLabel = done ? 'Modify Validation' : 'Validate';
+                        const btnIcon = done ? 'fa-pen-to-square' : 'fa-clipboard-check';
+                        const doneBadge = done
+                            ? `<span style="font-size:10px;font-weight:600;color:#15803d;background:#15803d14;border:1px solid #15803d44;padding:1px 7px;border-radius:10px;margin-left:6px;"><i class="fas fa-check-circle"></i> Validated</span>`
+                            : '';
 
                         return `
                             <div class="inbox-item">
@@ -144,6 +159,7 @@
                                     <div class="item-place">
                                         <i class="fas ${cfg.icon}" style="color:${cfg.color};width:16px;"></i>
                                         ${e.geocoded_place || e.extracted_place || 'Unknown place'}
+                                        ${doneBadge}
                                     </div>
                                     <div class="item-meta">
                                         ${e.publication_date ? formatDate(e.publication_date) : '—'}
@@ -153,7 +169,7 @@
                                 </div>
                                 <div class="item-actions">
                                     <button class="btn-validate-item" onclick="openInboxValidation('${e.url ? e.url.replace(/'/g, "\\'") : ''}')">
-                                        <i class="fas fa-clipboard-check"></i> Validate
+                                        <i class="fas ${btnIcon}"></i> ${btnLabel}
                                     </button>
                                 </div>
                             </div>

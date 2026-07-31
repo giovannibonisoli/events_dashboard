@@ -37,7 +37,7 @@ app.post('/api/newspapers', (req, res) => {
   }
 });
 
-const VALIDATED_FILE = path.join(__dirname, 'validated_news.json');
+const VALIDATED_FILE = path.join(__dirname, 'data', 'validated_news.json');
 
 function readValidated() {
   try {

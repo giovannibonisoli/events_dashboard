@@ -58,30 +58,39 @@
             border-radius: 10px; padding: 14px 18px; margin-bottom: 4px;
         }
         .multi-event-radio .radio-group {
-            display: flex; gap: 8px;
+            display: flex; gap: 8px; flex-wrap: wrap;
         }
         .multi-event-radio .radio-group label {
             display: flex; align-items: center; gap: 6px;
-            padding: 8px 16px; border-radius: 8px; cursor: pointer;
-            font-size: 13px; font-weight: 500; color: var(--text);
+            padding: 8px 14px; border-radius: 8px; cursor: pointer;
+            font-size: 12.5px; font-weight: 500; color: var(--text);
             border: 1.5px solid var(--border); transition: all .2s;
         }
-        .multi-event-radio .radio-group label:first-of-type {
+        .multi-event-radio .radio-group label[data-value="single"] {
             color: #2e7d32; border-color: #4caf50;
         }
-        .multi-event-radio .radio-group label:first-of-type:hover {
+        .multi-event-radio .radio-group label[data-value="single"]:hover {
             background: #4caf50; color: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(76,175,80,.3);
         }
-        .multi-event-radio .radio-group label:last-of-type {
-            color: #c62828; border-color: #f44336;
-        }
-        .multi-event-radio .radio-group label:last-of-type:hover {
-            background: #f44336; color: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(244,67,54,.3);
-        }
-        .multi-event-radio .radio-group label.selected:first-of-type {
+        .multi-event-radio .radio-group label[data-value="single"].selected {
             background: #4caf50; color: #fff; border-color: #4caf50;
         }
-        .multi-event-radio .radio-group label.selected:last-of-type {
+        .multi-event-radio .radio-group label[data-value="main_secondary"] {
+            color: #01579b; border-color: #0288d1;
+        }
+        .multi-event-radio .radio-group label[data-value="main_secondary"]:hover {
+            background: #0288d1; color: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(2,136,209,.3);
+        }
+        .multi-event-radio .radio-group label[data-value="main_secondary"].selected {
+            background: #0288d1; color: #fff; border-color: #0288d1;
+        }
+        .multi-event-radio .radio-group label[data-value="multiple"] {
+            color: #c62828; border-color: #f44336;
+        }
+        .multi-event-radio .radio-group label[data-value="multiple"]:hover {
+            background: #f44336; color: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(244,67,54,.3);
+        }
+        .multi-event-radio .radio-group label[data-value="multiple"].selected {
             background: #f44336; color: #fff; border-color: #f44336;
         }
         .multi-event-radio .radio-group input[type="radio"] {
@@ -91,6 +100,31 @@
             font-family: 'IBM Plex Mono', monospace; font-size: 11px;
             font-weight: 600; color: var(--text-muted);
             text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+        }
+        .multi-event-radio.disabled-others {
+            border-color: #f44336;
+        }
+        .multi-event-radio.disabled-others .field-name { color: #c62828; }
+        .multi-event-radio.disabled-others .field-name::after {
+            content: ' — other validations disabled'; color: #c62828; font-weight: 400;
+        }
+        .multi-event-radio .radio-group.radio-disabled label {
+            opacity: .4; pointer-events: none; cursor: not-allowed;
+        }
+        .validation-locked .validation-field,
+        .validation-locked .ki-row {
+            opacity: .45;
+        }
+        .validation-locked .validation-field .field-status button,
+        .validation-locked .ki-row .ki-status button,
+        .validation-locked .ki-row .btn-delete,
+        .validation-locked .ki-add-btn {
+            opacity: .3; cursor: not-allowed;
+        }
+        .validation-locked .field-correction input,
+        .validation-locked .field-correction textarea,
+        .validation-locked .field-correction select {
+            pointer-events: none; opacity: .5;
         }
         .validation-field {
             background: var(--bg-card); border: 1px solid var(--border);
@@ -386,11 +420,56 @@
             `;
         }
 
+        function lockValidation(message) {
+            window.__validationLockReason = message;
+            document.querySelector('.validation-fields')?.classList.add('validation-locked');
+            document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn').forEach(b => {
+                b.disabled = true;
+            });
+            // keep is_event buttons interactive so the "not event" decision can be rolled back
+            document.querySelectorAll('.validation-field[data-field="is_event"] .field-status button').forEach(b => {
+                b.disabled = false;
+            });
+            if (message === 'not_event') {
+                // disable the multi_event radio too
+                document.querySelectorAll('.multi-event-radio input[name="multi_event_radio"]').forEach(r => {
+                    r.disabled = true;
+                });
+                document.querySelector('.multi-event-radio .radio-group')?.classList.add('radio-disabled');
+            }
+            updateProgress();
+        }
+
+        function unlockValidation() {
+            window.__validationLockReason = null;
+            document.querySelector('.validation-fields')?.classList.remove('validation-locked');
+            document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn').forEach(b => {
+                b.disabled = false;
+            });
+            document.querySelectorAll('.multi-event-radio input[name="multi_event_radio"]').forEach(r => {
+                r.disabled = false;
+            });
+            document.querySelector('.multi-event-radio .radio-group')?.classList.remove('radio-disabled');
+            updateProgress();
+        }
+
         function onMultiEventChange(input) {
+            const box = document.getElementById('multiEventBox');
             const labels = input.closest('.radio-group').querySelectorAll('label');
             labels.forEach(l => l.classList.remove('selected'));
             input.closest('label').classList.add('selected');
-            updateProgress();
+            const value = input.value;
+            if (value === 'multiple') {
+                box.classList.add('disabled-others');
+                lockValidation('multiple');
+            } else {
+                box.classList.remove('disabled-others');
+                if (isNotEvent()) {
+                    lockValidation('not_event');
+                } else {
+                    unlockValidation();
+                }
+            }
         }
 
         function toggleDateNone(checkbox) {
@@ -431,7 +510,19 @@
                     correction.classList.remove('show');
                 }
             }
-            updateProgress();
+
+            if (fieldName === 'is_event') {
+                const multiRadio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
+                if (status === 'wrong') {
+                    lockValidation('not_event');
+                } else if (multiRadio && multiRadio.value === 'multiple') {
+                    lockValidation('multiple');
+                } else {
+                    unlockValidation();
+                }
+            } else {
+                updateProgress();
+            }
         }
 
         function setKIStatus(btn) {
@@ -620,7 +711,30 @@
             return state;
         }
 
+        function isNotEvent() {
+            const isEventField = document.querySelector('.validation-field[data-field="is_event"]');
+            if (!isEventField) return false;
+            const activeBtn = isEventField.querySelector('.field-status button[class*="active-"]');
+            if (!activeBtn) return false;
+            if (activeBtn.dataset.status !== 'wrong') return false;
+            return true;
+        }
+
+        function isValidationLocked() {
+            const radio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
+            if (radio && radio.value === 'multiple') return true;
+            return isNotEvent();
+        }
+
+        function lockReason() {
+            const radio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
+            if (radio && radio.value === 'multiple') return 'Multiple events, no predominant — other validations disabled';
+            if (isNotEvent()) return 'Not an event — other validations disabled';
+            return 'Validation disabled';
+        }
+
         function allFieldsValidated() {
+            if (isValidationLocked()) return true;
             const fields = document.querySelectorAll('.validation-field');
             for (const el of fields) {
                 const activeBtn = el.querySelector('.field-status button[class*="active-"]');
@@ -638,6 +752,16 @@
         }
 
         function updateProgress() {
+            if (isValidationLocked()) {
+                document.getElementById('progressFill').style.width = '100%';
+                document.getElementById('progressText').textContent = lockReason();
+                document.querySelectorAll('.btn-save-validation').forEach(saveBtn => {
+                    saveBtn.disabled = false;
+                    saveBtn.style.opacity = '1';
+                    saveBtn.style.cursor = 'pointer';
+                });
+                return;
+            }
             const fields = document.querySelectorAll('.validation-field');
             const kiRows = document.querySelectorAll('.ki-row:not([data-added="1"])');
             const multiRadio = document.querySelector('.multi-event-radio');
@@ -666,7 +790,7 @@
             }
         }
 
-        function render() {
+        async function render() {
             const event = getEvent();
             const container = document.getElementById('validationContent');
 
@@ -697,11 +821,13 @@
             ];
             const totalFields = groups.reduce((s, g) => s + g.keys.length, 0) + keyInfoFields.length;
 
-            const savedKey = 'validation_' + event.url;
             let savedState = null;
             try {
-                const s = localStorage.getItem(savedKey);
-                if (s) savedState = JSON.parse(s);
+                const resp = await fetch('/api/validated-news');
+                if (resp.ok) {
+                    const list = await resp.json();
+                    savedState = (list || []).find(x => x && x.url === event.url) || null;
+                }
             } catch (e) {}
 
             const savedFields = savedState?.fields || {};
@@ -741,11 +867,13 @@
                                 if (f === 'multi_event') {
                                     const savedVal = savedFields[f];
                                     const savedStatus = savedVal?.status || '';
-                                    html += '<div class="multi-event-radio">';
-                                    html += '  <div class="field-name" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Multi‑event</div>';
+                                    const cls = savedStatus === 'multiple' ? 'multi-event-radio disabled-others' : 'multi-event-radio';
+                                    html += '<div class="' + cls + '" id="multiEventBox">';
+                                    html += '  <div class="field-name" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Event type</div>';
                                     html += '  <div class="radio-group" data-field="multi_event">';
-                                    html += '    <label class="' + (savedStatus === 'yes' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="yes" ' + (savedStatus === 'yes' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-check-circle"></i> Yes</label>';
-                                    html += '    <label class="' + (savedStatus === 'no' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="no" ' + (savedStatus === 'no' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-times-circle"></i> No</label>';
+                                    html += '    <label data-value="single" class="' + (savedStatus === 'single' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="single" ' + (savedStatus === 'single' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-circle"></i> Single event</label>';
+                                    html += '    <label data-value="main_secondary" class="' + (savedStatus === 'main_secondary' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="main_secondary" ' + (savedStatus === 'main_secondary' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-star"></i> Main event with secondary events</label>';
+                                    html += '    <label data-value="multiple" class="' + (savedStatus === 'multiple' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="multiple" ' + (savedStatus === 'multiple' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-layer-group"></i> Multiple events, no predominant</label>';
                                     html += '  </div>';
                                     html += '</div>';
                                     continue;
@@ -830,6 +958,21 @@
                 <div id="validationNotification"></div>
             `;
 
+            if (isValidationLocked()) {
+                document.querySelector('.validation-fields').classList.add('validation-locked');
+                document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn').forEach(b => {
+                    b.disabled = true;
+                });
+                document.querySelectorAll('.validation-field[data-field="is_event"] .field-status button').forEach(b => {
+                    b.disabled = false;
+                });
+                if (isNotEvent()) {
+                    document.querySelectorAll('.multi-event-radio input[name="multi_event_radio"]').forEach(r => {
+                        r.disabled = true;
+                    });
+                    document.querySelector('.multi-event-radio .radio-group')?.classList.add('radio-disabled');
+                }
+            }
             updateProgress();
         }
 
@@ -863,11 +1006,9 @@
                     body: JSON.stringify(validation)
                 });
                 if (!resp.ok) throw new Error('Save failed');
-                localStorage.setItem('validation_' + event.url, JSON.stringify(validation));
                 showNotification('Validation saved successfully!', 'success');
             } catch (err) {
-                localStorage.setItem('validation_' + event.url, JSON.stringify(validation));
-                showNotification('Saved locally (server unavailable).', 'success');
+                showNotification('Could not save: server unavailable.', 'error');
             }
         }
 
