@@ -191,6 +191,11 @@
             margin-bottom: 4px; font-family: 'IBM Plex Mono', monospace;
             text-transform: uppercase; letter-spacing: .3px;
         }
+        .validation-prov-select {
+            width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+            border-radius: 6px; background: var(--bg); color: var(--text);
+            font-size: 13px; font-family: 'DM Sans', sans-serif;
+        }
         .validation-field .field-alert {
             display: flex; align-items: center; gap: 6px;
             margin-top: 8px; padding: 7px 12px; border-radius: 6px;
@@ -553,6 +558,9 @@ width: 100%; padding: 8px 12px;
         }
 
 // Render single_places field (similar to renderField but for array items)
+        const SP_PROV_FIELDS = ['specific_name_place', 'address', 'city', 'county', 'hamlet', 'urban_zone'];
+        const PROV_OPTIONS = ['extracted', 'deduced'];
+
         function renderSPField(name, label, value, savedState, disabled, type = 'text', attrs = '', selectOptions = null, isNew = false, provenance = null) {
             const isNull = value === null || value === undefined || value === '';
             const savedStatus = savedState?.status || '';
@@ -561,7 +569,23 @@ width: 100%; padding: 8px 12px;
             const savedNull = rawCorrection === '__none__' || (savedStatus === 'wrong' && rawCorrection === null);
             const hasStatus = savedStatus ? 'status-' + savedStatus : '';
             const dis = disabled ? 'disabled' : '';
-            
+
+            // Validation provenance selector (only for the six free-text place fields).
+            // This is independent of the provenance already present in the data,
+            // so it offers all possible values.
+            const leafField = name.replace(/^single_places\[\d+\]\./, '');
+            const needsProv = type === 'text' && SP_PROV_FIELDS.includes(leafField);
+            const savedVP = savedState?.validation_provenance || '';
+            const provOptions = PROV_OPTIONS;
+            const provLabel = '<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin:10px 0 4px;font-family:\'IBM Plex Mono\',monospace;text-transform:uppercase;letter-spacing:.3px;">Validation provenance</div>';
+            const provSelectHtml = (extraDis) => needsProv ? (
+                provLabel +
+                '<select class="validation-prov-select"' + extraDis + '>' +
+                '<option value="">— Select —</option>' +
+                provOptions.map(p => `<option value="${p}" ${savedVP === p ? 'selected' : ''}>${p}</option>`).join('') +
+                '</select>'
+            ) : '';
+
             // Always render correction div (hidden by default) so it can be shown when wrong is clicked
             let correctionHtml = '';
             if (!isNew) {
@@ -607,6 +631,7 @@ width: 100%; padding: 8px 12px;
                     <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}" style="${savedStatus === 'wrong' ? '' : 'display:none;'}">
                         <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
                         ${inputHtml}
+                        ${provSelectHtml((dis || savedNull) ? ' disabled' : '')}
                     </div>
                 `;
             }
@@ -641,6 +666,7 @@ width: 100%; padding: 8px 12px;
                                             <input type="checkbox" class="new-field-none-check" onchange="toggleNewFieldNone(this)"> Null
                                         </label>
                                     </div>
+                                    ${provSelectHtml('')}
                                 </div>
                             </div>
                         </div>
@@ -721,11 +747,19 @@ width: 100%; padding: 8px 12px;
         }
 
         function toggleSPDateNone(checkbox) {
-            const input = checkbox.closest('.field-correction').querySelector('.correction-sp-field');
+            const correction = checkbox.closest('.field-correction');
+            const input = correction.querySelector('.correction-sp-field');
             if (input) {
                 input.disabled = checkbox.checked;
                 if (checkbox.checked) input.value = '';
             }
+            const prov = correction.querySelector('.validation-prov-select');
+            if (prov) {
+                prov.disabled = checkbox.checked;
+                if (checkbox.checked) prov.value = '';
+            }
+            updateProgress();
+            updateFieldAlert(checkbox.closest('.validation-field'));
         }
 
         function toggleNewFieldNone(checkbox) {
@@ -1020,7 +1054,7 @@ width: 100%; padding: 8px 12px;
                 fieldsHtml;
             
             container.insertBefore(row, addBtn);
-            row.querySelectorAll('.sp-field-input, .new-field-none-check').forEach(inp => {
+            row.querySelectorAll('.sp-field-input, .new-field-none-check, .validation-prov-select').forEach(inp => {
                 inp.addEventListener('input', updateProgress);
                 inp.addEventListener('change', updateProgress);
             });
@@ -1151,6 +1185,10 @@ width: 100%; padding: 8px 12px;
                     status,
                     correction
                 };
+                const provSelect = el.querySelector('.validation-prov-select');
+                if (provSelect && correction != null && provSelect.value) {
+                    state[name].validation_provenance = provSelect.value;
+                }
             });
 
             // Restructure single_places from flat keys to array
@@ -1275,6 +1313,10 @@ width: 100%; padding: 8px 12px;
                         status,
                         correction
                     };
+                    const provSelect = el.querySelector('.validation-prov-select');
+                    if (provSelect && correction != null && provSelect.value) {
+                        placeFields[fieldKey].validation_provenance = provSelect.value;
+                    }
                 });
                 if (Object.keys(placeFields).length > 0) {
                     const targetKey = isNew ? '_added_single_places' : '_single_places';
@@ -1442,8 +1484,10 @@ width: 100%; padding: 8px 12px;
             }
             const noneCheck = correctionDiv.querySelector('.correction-none-check');
             const isNone = noneCheck && noneCheck.checked;
-            const inputs = correctionDiv.querySelectorAll('input:not(.correction-none-check), select, textarea');
+            const provSelect = correctionDiv.querySelector('.validation-prov-select');
+            const inputs = correctionDiv.querySelectorAll('input:not(.correction-none-check), select:not(.validation-prov-select), textarea');
             const hasCorrection = Array.from(inputs).some(inp => inp.value && String(inp.value).trim() !== '');
+            if (provSelect && !isNone) return hasCorrection && !!provSelect.value;
             return hasCorrection || !!isNone;
         }
 
@@ -1452,7 +1496,10 @@ width: 100%; padding: 8px 12px;
             const noneCheck = el.querySelector('.new-field-none-check');
             if (noneCheck && noneCheck.checked) return true;
             const input = el.querySelector('.sp-field-input');
-            return !!(input && input.value && String(input.value).trim() !== '');
+            const hasVal = !!(input && input.value && String(input.value).trim() !== '');
+            if (!hasVal) return false;
+            const provSelect = el.querySelector('.validation-prov-select');
+            return provSelect ? !!provSelect.value : true;
         }
 
         // Show/hide an inline reminder when a field is marked wrong but left uncorrected
@@ -1470,18 +1517,25 @@ width: 100%; padding: 8px 12px;
                 if (existing) existing.remove();
                 return;
             }
-            if (!existing) {
-                const alert = document.createElement('div');
-                alert.className = 'field-alert';
-                const hasNone = correctionDiv.querySelector('.correction-none-check');
-                const hasRadios = correctionDiv.querySelector('.multi-event-radio input[type="radio"]');
-                const msg = hasRadios
-                    ? 'Please select the corrected value.'
+            const hasNone = correctionDiv.querySelector('.correction-none-check');
+            const hasRadios = correctionDiv.querySelector('.multi-event-radio input[type="radio"]');
+            const provSelect = correctionDiv.querySelector('.validation-prov-select');
+            const corrInput = correctionDiv.querySelector('.correction-sp-field');
+            const hasCorrVal = !!(corrInput && corrInput.value && corrInput.value.trim() !== '');
+            const msg = hasRadios
+                ? 'Please select the corrected value.'
+                : (provSelect && hasCorrVal && !provSelect.value)
+                    ? 'Please select the validation provenance.'
                     : hasNone
                         ? 'Please insert the correction or check "Null".'
                         : 'Please insert the correction.';
+            if (!existing) {
+                const alert = document.createElement('div');
+                alert.className = 'field-alert';
                 alert.innerHTML = '<i class="fas fa-triangle-exclamation"></i> ' + msg;
                 correctionDiv.appendChild(alert);
+            } else {
+                existing.innerHTML = '<i class="fas fa-triangle-exclamation"></i> ' + msg;
             }
         }
 
@@ -1604,12 +1658,19 @@ width: 100%; padding: 8px 12px;
                     if (alert) alert.remove();
                     return;
                 }
+                const input = field.querySelector('.sp-field-input');
+                const provSelect = field.querySelector('.validation-prov-select');
+                const noneCheck = field.querySelector('.new-field-none-check');
+                const hasVal = !!(input && input.value && String(input.value).trim() !== '');
+                const msg = (provSelect && hasVal && !(noneCheck && noneCheck.checked) && !provSelect.value)
+                    ? 'Please select the validation provenance.'
+                    : 'Please insert the value or check "Null".';
                 if (!alert) {
                     alert = document.createElement('div');
                     alert.className = 'field-alert';
-                    alert.innerHTML = '<i class="fas fa-triangle-exclamation"></i> Please insert the value or check "Null".';
                     field.appendChild(alert);
                 }
+                alert.innerHTML = '<i class="fas fa-triangle-exclamation"></i> ' + msg;
             });
         }
 
