@@ -82,7 +82,7 @@ function isValidated(url) {
     return validatedUrls.has(url);
 }
 
-async function loadEvents() {
+async function loadEvents(lang = currentLanguage) {
     try {
         const response = await fetch('data/events.json');
         if (!response.ok) {
@@ -91,6 +91,9 @@ async function loadEvents() {
         const data = await response.json();
         // Supporta sia {events: [...]} che [...]
         events = data.events || data;
+
+        // Normalize events to internal format
+        events = events.map(e => normalizeEvent(e, lang));
 
         console.log(events);
 
@@ -102,21 +105,120 @@ async function loadEvents() {
     }
 }
 
+// Normalize new schema to internal format used by the app
+function normalizeEvent(e, lang = 'it') {
+    const firstPlace = e.single_places?.[0] || {};
+    let coordinates = { lat: 0, lng: 0 };
+    let geocoded_place = firstPlace.geocoded_name?.value || firstPlace.address?.value || '';
+    let allPlaces = [];
+    
+    // Language-aware crossroad naming
+    const crossroadPrefix = lang === 'it' ? 'Incrocio tra ' : 'Intersection of ';
+    const crossroadConjunction = lang === 'it' ? ' e ' : ' and ';
+    const crossroadFallback = lang === 'it' ? ' e altro' : ' and other';
+    const crossroadSingle = lang === 'it' ? 'Incrocio' : 'Intersection';
+    
+    if (e.place_type === 'intersection' && e.geocoded_intersection) {
+        // Use crossroad coordinates
+        coordinates = {
+            lat: parseFloat(e.geocoded_intersection.latitude) || 0,
+            lng: parseFloat(e.geocoded_intersection.longitude) || 0
+        };
+        // Format crossroad name based on language
+        const wayNames = (e.single_places || []).map(p => p.geocoded_name?.value || p.address?.value).filter(Boolean);
+        if (wayNames.length >= 2) {
+            geocoded_place = `${crossroadPrefix}${wayNames[0]}${crossroadConjunction}${wayNames[1]}`;
+        } else if (wayNames.length === 1) {
+            geocoded_place = `${crossroadPrefix}${wayNames[0]}${crossroadFallback}`;
+        } else {
+            geocoded_place = crossroadSingle;
+        }
+        allPlaces = [{
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+            name: geocoded_place,
+            isCrossroad: true
+        }];
+    } else if (e.place_type === 'single' || !e.place_type) {
+        // Use first (or only) place
+        coordinates = {
+            lat: parseFloat(firstPlace.latitude?.value) || 0,
+            lng: parseFloat(firstPlace.longitude?.value) || 0
+        };
+        geocoded_place = firstPlace.geocoded_name?.value || firstPlace.address?.value || '';
+        allPlaces = [{
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+            name: geocoded_place,
+            isCrossroad: false
+        }];
+    } else if (e.place_type === 'multiple') {
+        // Multiple places - store all for map visualization
+        const places = e.single_places || [];
+        allPlaces = places.map(p => ({
+            lat: parseFloat(p.latitude?.value) || 0,
+            lng: parseFloat(p.longitude?.value) || 0,
+            name: p.geocoded_name?.value || p.address?.value || '',
+            isCrossroad: false
+        })).filter(p => p.lat && p.lng);
+        
+        // Use centroid as main coordinates for filtering
+        if (allPlaces.length > 0) {
+            coordinates = {
+                lat: allPlaces.reduce((a, b) => a + b.lat, 0) / allPlaces.length,
+                lng: allPlaces.reduce((a, b) => a + b.lng, 0) / allPlaces.length
+            };
+        }
+        geocoded_place = allPlaces.map(p => p.name).filter(Boolean).join(', ') || 'Multiple locations';
+    }
+    
+    return {
+        ...e,
+        // Coordinates based on place_type logic
+        coordinates,
+        // All places for map rendering (used for "multiple" type)
+        allPlaces,
+        // Place name for display
+        geocoded_place,
+        // City for reference
+        geocoded_city: firstPlace.city?.value || '',
+        // Start date normalized
+        start_date: {
+            day: e.start_date?.day?.value,
+            month: e.start_date?.month?.value,
+            year: e.start_date?.year?.value
+        },
+        // End date normalized
+        end_date: e.end_date ? {
+            day: e.end_date.day?.value,
+            month: e.end_date.month?.value,
+            year: e.end_date.year?.value
+        } : null,
+        // Keep original fields for validation
+        _original: e
+    };
+}
+
 // Fallback in caso di errore
 function getFallbackEvents() {
     return [
-        // Inserisci qui alcuni eventi di esempio
         {
             category: "crime",
-            extracted_place: "Via Giuseppe Coppola, Modena",
-            coordinates: { lat: 44.651368, lng: 10.895358 },
-            date: "2026-01-12",
+            single_places: [{
+                latitude: {value: "44.651368"},
+                longitude: {value: "10.895358"},
+                geocoded_name: {value: "Via Giuseppe Coppola, Modena"},
+                address: {value: "Via Giuseppe Coppola"},
+                city: {value: "Modena"}
+            }],
+            start_date: {day: {value: 12}, month: {value: 1}, year: {value: 2026}},
             key_info: {
                 description: "Apartment burglary reported by residents",
                 estimated_value: "€3,000",
-            }
+            },
+            url: "#"
         }
-    ];
+    ].map(normalizeEvent);
 }
 
 // =============================================
@@ -362,50 +464,105 @@ function updateMarkers(filteredEvents, keyword) {
 
     filteredEvents.forEach(event => {
         const config = categoryConfig[event.category] || categoryConfig['crime'];
-        const marker = L.marker(
-            [event.coordinates.lat, event.coordinates.lng], 
-            { icon: getMarkerIcon(event.category), pmIgnore: true }
-        ).addTo(map);
+        const places = event.allPlaces || [];
+        const isMultiple = event.place_type === 'multiple' && places.length > 1;
+        const isCrossroad = event.place_type === 'intersection';
+        
+        // Create markers for each place
+        const markers = [];
+        let polyline = null;
+        
+        if (isMultiple) {
+            // Multiple places: create marker for each + connecting line
+            places.forEach((place, idx) => {
+                const marker = L.marker(
+                    [place.lat, place.lng], 
+                    { icon: getMarkerIcon(event.category), pmIgnore: true }
+                ).addTo(map);
+                
+                const categoryLabel = t.categories[event.category] || config.label;
+                const placeName = place.name || `Location ${idx + 1}`;
+                
+                marker.bindPopup(`
+                    <div style="min-width:220px;">
+                        <b style="font-size:15px;color:#0d1321;">${hl(placeName, keyword)}</b><br>
+                        <span style="color:#666;font-size:12px;">${formatDate(event.start_date)}</span><br>
+                        <span style="display:inline-block;padding:2px 10px;border-radius:12px;background:${config.color}22;color:${config.color};font-weight:600;font-size:11px;margin-top:5px;">
+                            <i class="fas ${config.icon}"></i> ${categoryLabel}
+                        </span>
+                        <div style="font-size:12.5px;color:#555;margin-top:7px;line-height:1.5;">
+                            ${renderInfoObject(event.key_info, keyword)}
+                        </div>
+                        <div style="margin-top:4px;font-size:11px;color:#888;">
+                            <i class="fas fa-map-marker-alt"></i> ${idx + 1} of ${places.length}
+                        </div>
+                    </div>
+                `);
+                
+                markers.push(marker);
+                currentMarkers.push(marker);
+            });
+            
+            // Add connecting polyline
+            if (places.length > 1) {
+                const latLngs = places.map(p => [p.lat, p.lng]);
+                polyline = L.polyline(latLngs, {
+                    color: config.color,
+                    weight: 2,
+                    opacity: 0.6,
+                    dashArray: '8, 6',
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(map);
+                currentMarkers.push(polyline);
+            }
+        } else {
+            // Single or crossroad: single marker
+            const marker = L.marker(
+                [event.coordinates.lat, event.coordinates.lng], 
+                { icon: getMarkerIcon(event.category), pmIgnore: true }
+            ).addTo(map);
 
-        const categoryLabel = t.categories[event.category] || config.label;
+            const categoryLabel = t.categories[event.category] || config.label;
 
-        // Genera l'HTML per l'URL nel popup
-        const urlHtml = event.url ? `
-            <div style="margin-top:8px;border-top:1px solid #eee;padding-top:6px;">
-                <a href="${event.url}" target="_blank" style="color:var(--accent);text-decoration:none;font-size:12px;display:inline-flex;align-items:center;gap:4px;">
-                    <i class="fas fa-external-link-alt"></i> ${t.readMore || 'Read more'}
-                </a>
-            </div>
-        ` : '';
-
-        const eventUrl = event.url ? event.url.replace(/'/g, "\\'") : '';
-        const popupDone = isValidated(event.url);
-        const popupLabel = popupDone ? (t.modifyValidation || 'Modify Validation') : (t.validate || 'Validate');
-        const popupIcon = popupDone ? 'fa-pen-to-square' : 'fa-clipboard-check';
-        const popupBadge = popupDone
-            ? `<div style="margin-top:6px;font-size:10.5px;font-weight:600;color:#15803d;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-check-circle"></i> ${t.validated || 'Validated'}</div>`
-            : '';
-        marker.bindPopup(`
-            <div style="min-width:220px;">
-                <b style="font-size:15px;color:#0d1321;">${hl(event.geocoded_place, keyword)}</b><br>
-                <span style="color:#666;font-size:12px;">${formatDate(event.start_date)}</span><br>
-                <span style="display:inline-block;padding:2px 10px;border-radius:12px;background:${config.color}22;color:${config.color};font-weight:600;font-size:11px;margin-top:5px;">
-                    <i class="fas ${config.icon}"></i> ${categoryLabel}
-                </span>
-                <div style="font-size:12.5px;color:#555;margin-top:7px;line-height:1.5;">
-                    ${renderInfoObject(event.key_info, keyword)}
-                    ${urlHtml}
+            // Genera l'HTML per l'URL nel popup
+            const urlHtml = event.url ? `
+                <div style="margin-top:8px;border-top:1px solid #eee;padding-top:6px;">
+                    <a href="${event.url}" target="_blank" style="color:var(--accent);text-decoration:none;font-size:12px;display:inline-flex;align-items:center;gap:4px;">
+                        <i class="fas fa-external-link-alt"></i> ${t.readMore || 'Read more'}
+                    </a>
                 </div>
-                ${popupBadge}
-                <div style="margin-top:8px;border-top:1px solid #eee;padding-top:6px;text-align:center;">
-                    <button onclick="window.openValidationByUrl('${eventUrl}')" style="background:${popupDone ? '#b45309' : '#15803d'};color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Outfit,sans-serif;display:inline-flex;align-items:center;gap:4px;">
-                        <i class="fas ${popupIcon}"></i> ${popupLabel}
-                    </button>
-                </div>
-            </div>
-        `);
+            ` : '';
 
-        currentMarkers.push(marker);
+            const eventUrl = event.url ? event.url.replace(/'/g, "\\'") : '';
+            const popupDone = isValidated(event.url);
+            const popupLabel = popupDone ? (t.modifyValidation || 'Modify Validation') : (t.validate || 'Validate');
+            const popupIcon = popupDone ? 'fa-pen-to-square' : 'fa-clipboard-check';
+            const popupBadge = popupDone
+                ? `<div style="margin-top:6px;font-size:10.5px;font-weight:600;color:#15803d;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-check-circle"></i> ${t.validated || 'Validated'}</div>`
+                : '';
+            marker.bindPopup(`
+                <div style="min-width:220px;">
+                    <b style="font-size:15px;color:#0d1321;">${hl(event.geocoded_place, keyword)}</b><br>
+                    <span style="color:#666;font-size:12px;">${formatDate(event.start_date)}</span><br>
+                    <span style="display:inline-block;padding:2px 10px;border-radius:12px;background:${config.color}22;color:${config.color};font-weight:600;font-size:11px;margin-top:5px;">
+                        <i class="fas ${config.icon}"></i> ${categoryLabel}
+                    </span>
+                    <div style="font-size:12.5px;color:#555;margin-top:7px;line-height:1.5;">
+                        ${renderInfoObject(event.key_info, keyword)}
+                        ${urlHtml}
+                    </div>
+                    ${popupBadge}
+                    <div style="margin-top:8px;border-top:1px solid #eee;padding-top:6px;text-align:center;">
+                        <button onclick="window.openValidationByUrl('${eventUrl}')" style="background:${popupDone ? '#b45309' : '#15803d'};color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Outfit,sans-serif;display:inline-flex;align-items:center;gap:4px;">
+                            <i class="fas ${popupIcon}"></i> ${popupLabel}
+                        </button>
+                    </div>
+                </div>
+            `);
+
+            currentMarkers.push(marker);
+        }
     });
 
     // Aggiorna il contatore con il numero di eventi validi
@@ -517,7 +674,7 @@ function updateEventsList(filteredEvents) {
 
     const keyword = (document.getElementById('keywordSearch').value || '').trim();
 
-    container.innerHTML = filteredEvents.map(e => {
+container.innerHTML = filteredEvents.map(e => {
         try {
             const config = categoryConfig[e.category] || categoryConfig['crime'];
             const categoryLabel = t.categories[e.category] || config.label;
@@ -537,12 +694,25 @@ function updateEventsList(filteredEvents) {
                 ? `<div class="validated-badge"><i class="fas fa-check-circle"></i> ${t.validated || 'Validated'}</div>`
                 : '';
 
+            // Build place names from allPlaces for multiple, or use geocoded_place
+            let placeHtml = '';
+            if (e.place_type === 'multiple' && e.allPlaces && e.allPlaces.length > 1) {
+                placeHtml = e.allPlaces.map((p, i) => `
+                    <div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+                        <span style="font-size:10px;color:var(--text-muted);background:var(--bg-hover);padding:1px 5px;border-radius:3px;">${i + 1}</span>
+                        ${hl(p.name || 'Unknown', keyword)}
+                    </div>
+                `).join('');
+            } else {
+                placeHtml = hl(e.geocoded_place, keyword);
+            }
+
             return `
                 <div class="event-item" style="border-left-color:${config.color};">
                     <div onclick="zoomToEvent(${e.coordinates.lat}, ${e.coordinates.lng})">
                         <div class="event-title">
                             <i class="fas ${config.icon}" style="color:${config.color};width:16px;"></i>
-                            ${hl(e.geocoded_place, keyword)}
+                            ${placeHtml}
                             ${badgeHtml}
                         </div>
                         <div class="event-date">${formatDate(e.start_date)}</div>
@@ -554,7 +724,7 @@ function updateEventsList(filteredEvents) {
                             ${urlHtml}
                         </div>
                     </div>
-                    <button class="btn-validate ${done ? 'btn-modify' : ''}" data-url="${e.url.replace(/"/g, '&quot;')}" onclick="event.stopPropagation(); openValidation(this)" title="${done ? 'Modify validation' : 'Validate annotation'}">
+                    <button class="btn-validate ${done ? 'btn-modify' : ''}" data-url="${e.url.replace(/"/g, '"')}" onclick="event.stopPropagation(); openValidation(this)" title="${done ? 'Modify validation' : 'Validate annotation'}">
                         <i class="fas ${validateIcon}"></i> ${validateLabel}
                     </button>
                 </div>
@@ -591,7 +761,8 @@ window.openValidationByUrl = function(url) {
     if (!url) return;
     const event = events.find(e => e.url === url);
     if (event) {
-        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
+        // Pass the original event data (new schema) for validation
+        sessionStorage.setItem('validatingEvent', JSON.stringify(event._original || event));
         window.location.href = 'validation.html';
     }
 };
@@ -601,7 +772,7 @@ function openValidation(btn) {
     if (!url) return;
     const event = events.find(e => e.url === url);
     if (event) {
-        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
+        sessionStorage.setItem('validatingEvent', JSON.stringify(event._original || event));
         window.location.href = 'validation.html';
     }
 }
@@ -609,25 +780,16 @@ function openValidation(btn) {
 function updateInboxBadge() {
     const badge = document.getElementById('inboxBadge');
     if (!badge) return;
-    const count = events.filter(e =>
-        !e.start_date || (typeof e.start_date === 'object' && e.start_date.year == null) || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
-    ).length;
+    const count = events.filter(e => {
+        const orig = e._original || e;
+        return !orig.start_date?.year?.value || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null;
+    }).length;
     badge.textContent = count;
-}
-
-function openValidation(btn) {
-    const url = btn.dataset.url;
-    if (!url) return;
-    const event = events.find(e => e.url === url);
-    if (event) {
-        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
-        window.location.href = 'validation.html';
-    }
 }
 
 function formatDate(d) {
     if (!d) return '';
-    if (typeof d === 'object' && d.year) {
+    if (typeof d === 'object' && d.year !== undefined) {
         const y = d.year, m = String(d.month || 1).padStart(2, '0'), day = String(d.day || 1).padStart(2, '0');
         return `${day}/${m}/${y}`;
     }
@@ -640,7 +802,7 @@ function formatDate(d) {
 
 function dateToComparable(d) {
     if (!d) return '';
-    if (typeof d === 'object' && d.year && d.year !== null) {
+    if (typeof d === 'object' && d.year !== undefined && d.year !== null) {
         const y = String(d.year).padStart(4, '0');
         const m = String(d.month || 1).padStart(2, '0');
         const day = String(d.day || 1).padStart(2, '0');
@@ -700,10 +862,6 @@ function editSelectedArea() {
 }
 
 function clearSelectedArea() {
-    // Rimuoviamo il layer con l'API nativa di Leaflet: clearLayers() NON
-    // scatena l'evento 'pm:remove' di Geoman (quello parte solo se la
-    // cancellazione avviene tramite la toolbar di Geoman), quindi qui
-    // gestiamo noi esplicitamente tutto lo stato in un solo passaggio.
     drawnItems.clearLayers();
 
     selectedArea = null;
@@ -720,7 +878,7 @@ function clearSelectedArea() {
 // =============================================
 window.onload = async function() {
     // 1. Prima carica gli eventi
-    await loadEvents();
+    await loadEvents(currentLanguage);
     await loadValidated();
     
     // 2. Imposta le date (PRIMA di inizializzare la mappa)
@@ -801,7 +959,7 @@ const translations = {
             'crime': 'Crime',
             'justice': 'Justice & Public Order',
             'accidents': 'Accidents & Emergencies',
-            'weather': 'Weather Alerts',  // ← Aggiungi questo
+            'weather': 'Weather Alerts',
             'health': 'Health',
             'society': 'Society & Daily Life',
             'sport': 'Sport',
@@ -813,12 +971,15 @@ const translations = {
             'crime': 'Crime',
             'justice': 'Justice',
             'accidents': 'Accidents',
-            'weather': 'Weather',  // ← Aggiungi questo
+            'weather': 'Weather',
             'health': 'Health',
             'society': 'Society',
             'sport': 'Sport',
             'culture': 'Culture'
-        }
+        },
+        // Buttons
+        exportValidatedNews: 'Export validated news',
+        inbox: 'Inbox'
     },
     'it': {
         // Brand
@@ -867,12 +1028,15 @@ const translations = {
             'crime': 'Criminalità',
             'justice': 'Giustizia',
             'accidents': 'Incidenti',
-            'weather': 'Meteo',  // ← Aggiungi questo
+            'weather': 'Meteo',
             'health': 'Sanità',
             'society': 'Società',
             'sport': 'Sport',
             'culture': 'Cultura'
-        }
+        },
+        // Buttons
+        exportValidatedNews: 'Esporta notizie validate',
+        inbox: 'Inbox'
     }
 };
 
@@ -885,7 +1049,9 @@ function updateUITexts(lang) {
         { selector: '.brand-sub', property: 'textContent', value: t.brandSub },
         { selector: '.btn-apply', property: 'innerHTML', value: `<i class="fas fa-magnifying-glass"></i> ${t.applyFilters}` },
         { selector: '.btn-reset', property: 'innerHTML', value: `<i class="fas fa-rotate-left"></i> ${t.reset}` },
-        { selector: '.btn-sources', property: 'innerHTML', value: `<i class="fas fa-newspaper"></i> ${t.sources}` }
+        { selector: '.btn-sources', property: 'innerHTML', value: `<i class="fas fa-newspaper"></i> ${t.sources}` },
+        { selector: '.btn-export', property: 'innerHTML', value: `<i class="fas fa-download"></i> ${t.exportValidatedNews}` },
+        { selector: '.btn-inbox', property: 'innerHTML', value: `<i class="fas fa-inbox"></i> ${t.inbox} <span id="inboxBadge" class="badge-inbox">0</span>` }
     ];
     
     updates.forEach(({ selector, property, value }) => {
@@ -973,6 +1139,9 @@ let currentLanguage = 'en';
 
 function switchLanguage(lang) {
     currentLanguage = lang;
+    
+    // Re-normalize events with new language for crossroad names
+    events = events.map(e => normalizeEvent(e._original || e, lang));
     
     // Aggiorna la select
     document.getElementById('languageSelect').value = lang;
