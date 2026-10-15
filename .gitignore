@@ -9,6 +9,7 @@ develop-eggs/
 dist/
 downloads/
 data/
+old_data/
 eggs/
 .eggs/
 lib/

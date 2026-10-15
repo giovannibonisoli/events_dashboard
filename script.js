@@ -105,12 +105,47 @@ async function loadEvents(lang = currentLanguage) {
     }
 }
 
+function unwrapValue(obj) {
+    if (obj == null) return null;
+    if (typeof obj === 'object' && 'value' in obj) {
+        return obj.value == null ? null : obj.value;
+    }
+    if (typeof obj === 'object') return null;
+    return obj;
+}
+
+function unwrapWithProvenance(obj) {
+    if (obj == null) return { value: null, provenance: null };
+    if (typeof obj === 'object' && 'value' in obj) {
+        return { 
+            value: obj.value == null ? null : obj.value, 
+            provenance: obj.provenance || null 
+        };
+    }
+    if (typeof obj === 'object') return { value: null, provenance: null };
+    return { value: obj, provenance: null };
+}
+
+function placeNameFrom(place) {
+    if (!place) return '';
+    return unwrapValue(place.geocoded_name) || unwrapValue(place.address) || '';
+}
+
+function placeDetailHtml(hamlet, urbanZone, keyword) {
+    const parts = [];
+    if (hamlet) parts.push(keyword ? hl(hamlet, keyword) : hamlet);
+    if (urbanZone) parts.push(keyword ? hl(urbanZone, keyword) : urbanZone);
+    if (!parts.length) return '';
+    return `<div style="font-size:11px;color:#888;font-weight:400;margin-top:2px;">${parts.join(' · ')}</div>`;
+}
+
 // Normalize new schema to internal format used by the app
 function normalizeEvent(e, lang = 'it') {
     const firstPlace = e.single_places?.[0] || {};
     let coordinates = { lat: 0, lng: 0 };
-    let geocoded_place = firstPlace.geocoded_name?.value || firstPlace.address?.value || '';
+    let geocoded_place = placeNameFrom(firstPlace);
     let allPlaces = [];
+    let locationProvenance = {};
     
     // Language-aware crossroad naming
     const crossroadPrefix = lang === 'it' ? 'Incrocio tra ' : 'Intersection of ';
@@ -118,14 +153,26 @@ function normalizeEvent(e, lang = 'it') {
     const crossroadFallback = lang === 'it' ? ' e altro' : ' and other';
     const crossroadSingle = lang === 'it' ? 'Incrocio' : 'Intersection';
     
+    // Helper to extract location fields with provenance
+    function getLocFields(place) {
+        const fields = ['address', 'city', 'county', 'hamlet', 'urban_zone', 'latitude', 'longitude', 'osm_type', 'osm_id', 'geocoded_name'];
+        const result = {};
+        for (const field of fields) {
+            const wp = unwrapWithProvenance(place[field]);
+            result[field] = wp.value;
+            result[field + '_provenance'] = wp.provenance;
+        }
+        return result;
+    }
+    
     if (e.place_type === 'intersection' && e.geocoded_intersection) {
         // Use crossroad coordinates
         coordinates = {
-            lat: parseFloat(e.geocoded_intersection.latitude) || 0,
-            lng: parseFloat(e.geocoded_intersection.longitude) || 0
+            lat: parseFloat(unwrapValue(e.geocoded_intersection.latitude)) || 0,
+            lng: parseFloat(unwrapValue(e.geocoded_intersection.longitude)) || 0
         };
         // Format crossroad name based on language
-        const wayNames = (e.single_places || []).map(p => p.geocoded_name?.value || p.address?.value).filter(Boolean);
+        const wayNames = (e.single_places || []).map(p => placeNameFrom(p)).filter(Boolean);
         if (wayNames.length >= 2) {
             geocoded_place = `${crossroadPrefix}${wayNames[0]}${crossroadConjunction}${wayNames[1]}`;
         } else if (wayNames.length === 1) {
@@ -133,33 +180,43 @@ function normalizeEvent(e, lang = 'it') {
         } else {
             geocoded_place = crossroadSingle;
         }
+        // Get provenance for intersection
+        locationProvenance = getLocFields(e.geocoded_intersection || {});
         allPlaces = [{
             lat: coordinates.lat,
             lng: coordinates.lng,
             name: geocoded_place,
+            hamlet: unwrapValue(firstPlace.hamlet),
+            urbanZone: unwrapValue(firstPlace.urban_zone),
             isCrossroad: true
         }];
     } else if (e.place_type === 'single' || !e.place_type) {
         // Use first (or only) place
         coordinates = {
-            lat: parseFloat(firstPlace.latitude?.value) || 0,
-            lng: parseFloat(firstPlace.longitude?.value) || 0
+            lat: parseFloat(unwrapValue(firstPlace.latitude)) || 0,
+            lng: parseFloat(unwrapValue(firstPlace.longitude)) || 0
         };
-        geocoded_place = firstPlace.geocoded_name?.value || firstPlace.address?.value || '';
+        geocoded_place = placeNameFrom(firstPlace);
+        locationProvenance = getLocFields(firstPlace);
         allPlaces = [{
             lat: coordinates.lat,
             lng: coordinates.lng,
             name: geocoded_place,
+            hamlet: unwrapValue(firstPlace.hamlet),
+            urbanZone: unwrapValue(firstPlace.urban_zone),
             isCrossroad: false
         }];
     } else if (e.place_type === 'multiple') {
         // Multiple places - store all for map visualization
         const places = e.single_places || [];
         allPlaces = places.map(p => ({
-            lat: parseFloat(p.latitude?.value) || 0,
-            lng: parseFloat(p.longitude?.value) || 0,
-            name: p.geocoded_name?.value || p.address?.value || '',
-            isCrossroad: false
+            lat: parseFloat(unwrapValue(p.latitude)) || 0,
+            lng: parseFloat(unwrapValue(p.longitude)) || 0,
+            name: placeNameFrom(p),
+            hamlet: unwrapValue(p.hamlet),
+            urbanZone: unwrapValue(p.urban_zone),
+            isCrossroad: false,
+            provenance: getLocFields(p)
         })).filter(p => p.lat && p.lng);
         
         // Use centroid as main coordinates for filtering
@@ -177,22 +234,27 @@ function normalizeEvent(e, lang = 'it') {
         // Coordinates based on place_type logic
         coordinates,
         // All places for map rendering (used for "multiple" type)
-        allPlaces,
+        allPlaces: allPlaces.map(p => ({
+            ...p,
+            provenance: p.provenance || getLocFields(p)
+        })),
         // Place name for display
         geocoded_place,
         // City for reference
         geocoded_city: firstPlace.city?.value || '',
+        // Location provenance
+        location_provenance: locationProvenance,
         // Start date normalized
         start_date: {
-            day: e.start_date?.day?.value,
-            month: e.start_date?.month?.value,
-            year: e.start_date?.year?.value
+            day: unwrapValue(e.start_date?.day),
+            month: unwrapValue(e.start_date?.month),
+            year: unwrapValue(e.start_date?.year)
         },
         // End date normalized
         end_date: e.end_date ? {
-            day: e.end_date.day?.value,
-            month: e.end_date.month?.value,
-            year: e.end_date.year?.value
+            day: unwrapValue(e.end_date.day),
+            month: unwrapValue(e.end_date.month),
+            year: unwrapValue(e.end_date.year)
         } : null,
         // Keep original fields for validation
         _original: e
@@ -485,7 +547,8 @@ function updateMarkers(filteredEvents, keyword) {
                 
                 marker.bindPopup(`
                     <div style="min-width:220px;">
-                        <b style="font-size:15px;color:#0d1321;">${hl(placeName, keyword)}</b><br>
+                        <b style="font-size:15px;color:#0d1321;">${hl(placeName, keyword)}</b>
+                        ${placeDetailHtml(place.hamlet, place.urbanZone, keyword)}
                         <span style="color:#666;font-size:12px;">${formatDate(event.start_date)}</span><br>
                         <span style="display:inline-block;padding:2px 10px;border-radius:12px;background:${config.color}22;color:${config.color};font-weight:600;font-size:11px;margin-top:5px;">
                             <i class="fas ${config.icon}"></i> ${categoryLabel}
@@ -541,9 +604,11 @@ function updateMarkers(filteredEvents, keyword) {
             const popupBadge = popupDone
                 ? `<div style="margin-top:6px;font-size:10.5px;font-weight:600;color:#15803d;display:inline-flex;align-items:center;gap:4px;"><i class="fas fa-check-circle"></i> ${t.validated || 'Validated'}</div>`
                 : '';
+            const p0 = event.allPlaces && event.allPlaces[0];
             marker.bindPopup(`
                 <div style="min-width:220px;">
-                    <b style="font-size:15px;color:#0d1321;">${hl(event.geocoded_place, keyword)}</b><br>
+                    <b style="font-size:15px;color:#0d1321;">${hl(event.geocoded_place, keyword)}</b>
+                    ${p0 ? placeDetailHtml(p0.hamlet, p0.urbanZone, keyword) : ''}
                     <span style="color:#666;font-size:12px;">${formatDate(event.start_date)}</span><br>
                     <span style="display:inline-block;padding:2px 10px;border-radius:12px;background:${config.color}22;color:${config.color};font-weight:600;font-size:11px;margin-top:5px;">
                         <i class="fas ${config.icon}"></i> ${categoryLabel}
@@ -694,18 +759,20 @@ container.innerHTML = filteredEvents.map(e => {
                 ? `<div class="validated-badge"><i class="fas fa-check-circle"></i> ${t.validated || 'Validated'}</div>`
                 : '';
 
-            // Build place names from allPlaces for multiple, or use geocoded_place
-            let placeHtml = '';
-            if (e.place_type === 'multiple' && e.allPlaces && e.allPlaces.length > 1) {
-                placeHtml = e.allPlaces.map((p, i) => `
-                    <div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
-                        <span style="font-size:10px;color:var(--text-muted);background:var(--bg-hover);padding:1px 5px;border-radius:3px;">${i + 1}</span>
-                        ${hl(p.name || 'Unknown', keyword)}
+            const places = (e.allPlaces && e.allPlaces.length) ? e.allPlaces : [{ name: e.geocoded_place }];
+            const placeHtml = places.map((p, i) => {
+                const extras = placeDetailHtml(p.hamlet, p.urbanZone, keyword);
+                const numbered = places.length > 1 && !p.isCrossroad;
+                return `
+                    <div style="display:flex;align-items:flex-start;gap:6px;margin:2px 0;">
+                        ${numbered ? `<span style="font-size:10px;color:var(--text-muted);background:var(--bg-hover);padding:1px 5px;border-radius:3px;margin-top:2px;">${i + 1}</span>` : ''}
+                        <div>
+                            ${hl(p.name || 'Unknown', keyword)}
+                            ${extras}
+                        </div>
                     </div>
-                `).join('');
-            } else {
-                placeHtml = hl(e.geocoded_place, keyword);
-            }
+                `;
+            }).join('');
 
             return `
                 <div class="event-item" style="border-left-color:${config.color};">
@@ -782,7 +849,8 @@ function updateInboxBadge() {
     if (!badge) return;
     const count = events.filter(e => {
         const orig = e._original || e;
-        return !orig.start_date?.year?.value || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null;
+        const year = orig.start_date?.year?.value ?? orig.start_date?.year;
+        return !year || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null;
     }).length;
     badge.textContent = count;
 }

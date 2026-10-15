@@ -118,13 +118,21 @@
         .validation-locked .validation-field .field-status button,
         .validation-locked .ki-row .ki-status button,
         .validation-locked .ki-row .btn-delete,
-        .validation-locked .ki-add-btn {
+        .validation-locked .ki-add-btn,
+        .validation-locked .sp-add-btn {
             opacity: .3; cursor: not-allowed;
         }
         .validation-locked .field-correction input,
         .validation-locked .field-correction textarea,
-        .validation-locked .field-correction select {
+        .validation-locked .field-correction select,
+        .validation-locked .sp-field-input {
             pointer-events: none; opacity: .5;
+        }
+        .sp-row.sp-disabled .validation-field {
+            opacity: 0.4;
+        }
+        .sp-row.sp-disabled .validation-field .field-value {
+            color: var(--text-muted);
         }
         .validation-field {
             background: var(--bg-card); border: 1px solid var(--border);
@@ -182,6 +190,39 @@
             font-size: 11px; font-weight: 600; color: var(--text-muted);
             margin-bottom: 4px; font-family: 'IBM Plex Mono', monospace;
             text-transform: uppercase; letter-spacing: .3px;
+        }
+        .validation-field .field-alert {
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 8px; padding: 7px 12px; border-radius: 6px;
+            font-size: 12px; font-weight: 500;
+            background: #b71c1c22; color: #c62828; border: 1px solid #c6282844;
+        }
+        .places-warning {
+            display: flex; align-items: center; gap: 8px;
+            margin: 10px 0; padding: 10px 14px; border-radius: 8px;
+            font-size: 13px; font-weight: 500;
+            background: #b71c1c22; color: #c62828; border: 1px solid #c6282844;
+        }
+        .validation-field .multi-event-radio {
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .validation-field .multi-event-radio-option {
+            flex: 1; min-width: 130px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 12px; border-radius: 8px;
+            border: 1.5px solid var(--border); background: var(--bg);
+            cursor: pointer; font-size: 12px; font-weight: 500;
+            color: var(--text); transition: all .2s;
+        }
+        .validation-field .multi-event-radio-option:hover {
+            border-color: var(--accent);
+        }
+        .validation-field .multi-event-radio-option input[type="radio"] {
+            width: auto; padding: 0; margin: 0;
+            accent-color: var(--accent); cursor: pointer;
+        }
+        .validation-field .multi-event-radio-option:has(input:checked) {
+            border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
         }
         .validation-actions { display: flex; gap: 12px; margin-top: 24px; }
         .btn-save-validation {
@@ -251,6 +292,28 @@
             font-size: 13px; transition: all .2s; justify-content: center;
         }
         .ki-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-hover); }
+        .sp-add-btn {
+            display: flex; align-items: center; gap: 6px; padding: 10px 16px;
+            background: var(--bg-card); border: 1.5px dashed var(--border);
+            border-radius: 10px; color: var(--text-muted); cursor: pointer;
+            font-size: 13px; transition: all .2s; justify-content: center;
+        }
+        .sp-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-hover); }
+        .sp-field-input {
+width: 100%; padding: 8px 12px;
+            border: 1px solid var(--border); border-radius: 6px;
+            background: var(--bg); color: var(--text);
+            font-size: 13px; font-family: 'DM Sans', sans-serif;
+        }
+        .validation-field .new-field-wrap {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .validation-field .new-field-wrap .sp-field-input { flex: 1; width: auto; }
+        .validation-field .new-field-none-label {
+            font-size: 12px; color: var(--text-muted);
+            display: flex; align-items: center; gap: 4px;
+            cursor: pointer; white-space: nowrap; flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -275,6 +338,22 @@
             'sport': { color: '#4e342e', icon: 'fa-futbol', label: 'Sport' },
             'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' }
         };
+
+        // Helper to extract value from { value } schema
+        function getVal(obj) {
+            if (!obj) return null;
+            if (typeof obj === 'object' && 'value' in obj) return obj.value;
+            return obj;
+        }
+
+        // Helper to extract provenance from { value, provenance } schema
+        function getProv(obj) {
+            if (!obj) return null;
+            if (typeof obj === 'object' && 'provenance' in obj) return obj.provenance;
+            return null;
+        }
+
+        let savedFieldsCache = {};
 
         function getEvent() {
             try {
@@ -319,12 +398,21 @@
                 const datePrefix = isDatePart[1] === 'start_date' ? 'Start Date' : 'End Date';
                 const partLabel = isDatePart[2].charAt(0).toUpperCase() + isDatePart[2].slice(1);
                 displayName = datePrefix + ' › ' + partLabel;
+            } else if (name.startsWith('single_places[')) {
+                // Clean up display name for single_places[0].field
+                displayName = name.replace(/^single_places\[\d+\]\./, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            } else if (name === 'geocoded_intersection.latitude') {
+                displayName = 'Latitude';
+            } else if (name === 'geocoded_intersection.longitude') {
+                displayName = 'Longitude';
             } else {
                 displayName = name.replace(/^key_info\./, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             }
             const isNull = value === null || value === undefined || value === '';
             const savedStatus = savedState?.status || '';
-            const correction = savedState?.correction || '';
+            const rawCorrection = savedState?.correction;
+            const correction = rawCorrection || '';
+            const savedNull = rawCorrection === '__none__' || (savedStatus === 'wrong' && rawCorrection === null);
             const isKeyInfo = name.startsWith('key_info.');
             const prefix = isKeyInfo ? '<span style="font-size:10px;color:var(--text-muted);font-weight:400;">KEY_INFO › </span>' : '';
 
@@ -332,11 +420,15 @@
 
             const displayValue = name === 'category'
                 ? (categoryConfig[value] ? categoryConfig[value].label : value)
-                : (isDatePart && isNull) ? 'None'
-                : value;
+                : name === 'multi_event'
+                    ? (value === 'single' ? 'Single event' : value === 'main_secondary' ? 'Main + secondary' : value === 'multiple' ? 'Multiple events' : value || '—')
+                    : name === 'place_type'
+                        ? (value === 'single' ? 'Single place' : value === 'intersection' ? 'Intersection' : value === 'multiple' ? 'Multiple places' : value || '—')
+                        : (isDatePart && isNull) ? 'None'
+                        : value;
 
             let correctionHtml = '';
-            if (name === 'is_event' || name === 'multi_event') {
+            if (name === 'is_event') {
                 correctionHtml = '';
             } else if (name === 'category') {
                 const currentVal = typeof value === 'string' ? value : '';
@@ -358,19 +450,19 @@
                 const attrs = part === 'year' ? 'min="1900" max="2100" style="width:100px;"' :
                               part === 'month' ? 'min="1" max="12" style="width:80px;"' :
                               'min="1" max="31" style="width:80px;"';
-                const isNone = correction === '__none__';
+                const isNone = savedNull;
                 correctionHtml = `
                     <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
                         <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="number" ${attrs} placeholder="${part}" value="${isNone ? '' : String(correction ?? value ?? '')}" class="correction-date-input">
                             <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
-                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleDateNone(this)"> None
+                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleDateNone(this)"> Null
                             </label>
                         </div>
                     </div>
                 `;
-            } else if (name === 'osm_type') {
+} else if (name === 'osm_type' || name === 'single_places[0].osm_type') {
                 const osmOptions = ['node', 'way', 'relation'];
                 const selectedCorrection = (savedStatus === 'wrong' && correction) ? correction : '';
                 correctionHtml = `
@@ -382,12 +474,52 @@
                         </select>
                     </div>
                 `;
-            } else if (name === 'osm_id') {
+            } else if (name === 'osm_id' || name === 'single_places[0].osm_id') {
                 const osmIdVal = (savedStatus === 'wrong' && correction) ? String(correction) : '';
                 correctionHtml = `
                     <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
                         <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
-                        <input type="number" step="1" min="0" class="correction-osm-id" placeholder="OSM ID" value="${osmIdVal.replace(/"/g, '&quot;')}">
+                        <input type="number" step="1" min="0" class="correction-osm-id" placeholder="OSM ID" value="${osmIdVal.replace(/"/g, '"')}">
+                    </div>
+                `;
+            } else if (name === 'multi_event') {
+                const multiOptions = [
+                    { value: 'single', label: 'Single Event' },
+                    { value: 'main_secondary', label: 'Main + Secondary' },
+                    { value: 'multiple', label: 'Multiple Events' }
+                ].filter(opt => opt.value !== (value || 'single'));
+                const selectedCorrection = (savedStatus === 'wrong' && correction) ? correction : '';
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}" style="${savedStatus === 'wrong' ? '' : 'display:none;'}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <div class="multi-event-radio">
+                            ${multiOptions.map(opt => `
+                                <label class="multi-event-radio-option">
+                                    <input type="radio" name="multi_event_radio" value="${opt.value}" ${selectedCorrection === opt.value ? 'checked' : ''} onchange="onMultiEventCorrection(this)">
+                                    <span>${opt.label}</span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (name === 'place_type') {
+                const placeOptions = ['single', 'intersection', 'multiple'];
+                const selectedCorrection = (savedStatus === 'wrong' && correction) ? correction : '';
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <select class="correction-sp-field">
+                            <option value="">— Select —</option>
+                            ${placeOptions.map(opt => `<option value="${opt}" ${selectedCorrection === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            } else if (name === 'geocoded_intersection.latitude' || name === 'geocoded_intersection.longitude') {
+                const numCorr = (savedStatus === 'wrong' && correction != null && correction !== '') ? String(correction) : '';
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        <input type="number" step="0.0000001" class="correction-intersection" placeholder="${name.endsWith('latitude') ? 'Latitude' : 'Longitude'}" value="${numCorr}">
                     </div>
                 `;
             } else {
@@ -420,10 +552,123 @@
             `;
         }
 
+// Render single_places field (similar to renderField but for array items)
+        function renderSPField(name, label, value, savedState, disabled, type = 'text', attrs = '', selectOptions = null, isNew = false, provenance = null) {
+            const isNull = value === null || value === undefined || value === '';
+            const savedStatus = savedState?.status || '';
+            const rawCorrection = savedState?.correction;
+            const correction = rawCorrection || '';
+            const savedNull = rawCorrection === '__none__' || (savedStatus === 'wrong' && rawCorrection === null);
+            const hasStatus = savedStatus ? 'status-' + savedStatus : '';
+            const dis = disabled ? 'disabled' : '';
+            
+            // Always render correction div (hidden by default) so it can be shown when wrong is clicked
+            let correctionHtml = '';
+            if (!isNew) {
+                let inputHtml = '';
+                if (type === 'select' && selectOptions) {
+                    const selectedCorrection = correction || '';
+                    const isNone = savedNull;
+                    inputHtml = `
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <select class="correction-sp-field" ${dis} ${isNone ? 'disabled' : ''}>
+                                <option value="">— Select —</option>
+                                <option value="__none__" ${isNone ? 'selected' : ''}>Null</option>
+                                ${selectOptions.map(opt => `<option value="${opt}" ${selectedCorrection === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                            </select>
+                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleSPDateNone(this)"> Null
+                            </label>
+                        </div>
+                    `;
+                } else if (type === 'number') {
+                    const numVal = correction || '';
+                    const isNone = savedNull;
+                    inputHtml = `
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input type="number" class="correction-sp-field" ${attrs} value="${isNone ? '' : numVal}" ${dis} ${isNone ? 'disabled' : ''}>
+                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleSPDateNone(this)"> Null
+                            </label>
+                        </div>
+                    `;
+                } else {
+                    const isNone = savedNull;
+                    inputHtml = `
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input type="text" class="correction-sp-field" value="${isNone ? '' : correction.replace(/"/g, '"')}" ${dis} ${isNone ? 'disabled' : ''}>
+                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleSPDateNone(this)"> Null
+                            </label>
+                        </div>
+                    `;
+                }
+                correctionHtml = `
+                    <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}" style="${savedStatus === 'wrong' ? '' : 'display:none;'}">
+                        <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
+                        ${inputHtml}
+                    </div>
+                `;
+            }
+            
+            const displayValue = isNull ? '—' : value;
+            const provenanceBadge = provenance ? `<span class="provenance-badge" style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg-hover);color:var(--text-muted);margin-left:6px;font-family:'IBM Plex Mono',monospace;">${provenance}</span>` : '';
+
+            // For new fields, show as editable inputs without validation buttons
+            if (isNew) {
+                let inputHtml = '';
+                if (type === 'select' && selectOptions) {
+                    inputHtml = `
+                        <select class="sp-field-input" ${attrs}>
+                            <option value="">— Select —</option>
+                            ${selectOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                        </select>
+                    `;
+                } else if (type === 'number') {
+                    inputHtml = `<input type="number" class="sp-field-input" ${attrs} value="${value || ''}">`;
+                } else {
+                    inputHtml = `<input type="text" class="sp-field-input" value="${value.replace(/"/g, '"')}">`;
+                }
+                return `
+                    <div class="validation-field" data-field="${name}" style="margin:4px 0 4px 148px;">
+                        <div class="field-row">
+                            <div class="field-info">
+                                <div class="field-name">${label}</div>
+                                <div class="field-value">
+                                    <div class="new-field-wrap">
+                                        ${inputHtml}
+                                        <label class="new-field-none-label">
+                                            <input type="checkbox" class="new-field-none-check" onchange="toggleNewFieldNone(this)"> Null
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="validation-field ${hasStatus}" data-field="${name}" style="margin:4px 0 4px 148px;">
+                    <div class="field-row">
+                        <div class="field-info">
+                            <div class="field-name">${label}</div>
+                            <div class="field-value ${isNull ? 'null-value' : ''}">${displayValue}${provenanceBadge}</div>
+                        </div>
+                        <div class="field-status">
+                            <button type="button" class="${savedStatus === 'correct' ? 'active-correct' : ''}" data-status="correct" title="Correct" onclick="setSPFieldStatus(this, '${name}')" ${dis}><i class="fas fa-check"></i></button>
+                            <button type="button" class="${savedStatus === 'wrong' ? 'active-wrong' : ''}" data-status="wrong" title="Wrong" onclick="setSPFieldStatus(this, '${name}')" ${dis}><i class="fas fa-edit"></i></button>
+                        </div>
+                    </div>
+                    ${correctionHtml}
+                </div>
+`;
+        }
+
         function lockValidation(message) {
             window.__validationLockReason = message;
             document.querySelector('.validation-fields')?.classList.add('validation-locked');
-            document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn').forEach(b => {
+            document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn, .sp-row .sp-status button, .sp-row .btn-delete, .sp-add-btn').forEach(b => {
                 b.disabled = true;
             });
             // keep is_event buttons interactive so the "not event" decision can be rolled back
@@ -431,11 +676,10 @@
                 b.disabled = false;
             });
             if (message === 'not_event') {
-                // disable the multi_event radio too
-                document.querySelectorAll('.multi-event-radio input[name="multi_event_radio"]').forEach(r => {
-                    r.disabled = true;
-                });
-                document.querySelector('.multi-event-radio .radio-group')?.classList.add('radio-disabled');
+                const multiEventField = document.querySelector('.validation-field[data-field="multi_event"]');
+                if (multiEventField) {
+                    multiEventField.querySelectorAll('.field-status button').forEach(b => { b.disabled = true; });
+                }
             }
             updateProgress();
         }
@@ -443,13 +687,9 @@
         function unlockValidation() {
             window.__validationLockReason = null;
             document.querySelector('.validation-fields')?.classList.remove('validation-locked');
-            document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn').forEach(b => {
+            document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn, .sp-row .sp-status button, .sp-row .btn-delete, .sp-add-btn').forEach(b => {
                 b.disabled = false;
             });
-            document.querySelectorAll('.multi-event-radio input[name="multi_event_radio"]').forEach(r => {
-                r.disabled = false;
-            });
-            document.querySelector('.multi-event-radio .radio-group')?.classList.remove('radio-disabled');
             updateProgress();
         }
 
@@ -480,6 +720,24 @@
             }
         }
 
+        function toggleSPDateNone(checkbox) {
+            const input = checkbox.closest('.field-correction').querySelector('.correction-sp-field');
+            if (input) {
+                input.disabled = checkbox.checked;
+                if (checkbox.checked) input.value = '';
+            }
+        }
+
+        function toggleNewFieldNone(checkbox) {
+            const wrap = checkbox.closest('.new-field-wrap');
+            const input = wrap?.querySelector('.sp-field-input');
+            if (input) {
+                input.disabled = checkbox.checked;
+                if (checkbox.checked) input.value = '';
+            }
+            updateProgress();
+        }
+
         function toggleCategoryOther(select) {
             const otherInput = select.parentElement.querySelector('.correction-category-other');
             if (otherInput) {
@@ -505,24 +763,57 @@
                     correction.classList.add('show');
                     const input = correction.querySelector('input, textarea, select');
                     if (input) input.focus();
+                    // Add change listeners to correction inputs to update progress
+                    correction.querySelectorAll('input, textarea, select').forEach(inp => {
+                        inp.addEventListener('change', updateProgress);
+                        inp.addEventListener('input', updateProgress);
+                        inp.addEventListener('input', () => updateFieldAlert(field));
+                        inp.addEventListener('change', () => updateFieldAlert(field));
+                        inp.addEventListener('focus', () => updateFieldAlert(field));
+                        inp.addEventListener('blur', () => setTimeout(() => updateFieldAlert(field), 0));
+                    });
+                    if (fieldName === 'place_type') {
+                        correction.querySelectorAll('input, select').forEach(inp => {
+                            inp.addEventListener('change', updateIntersectionFields);
+                            inp.addEventListener('input', updateIntersectionFields);
+                        });
+                    }
                 } else {
                     correction.style.display = 'none';
                     correction.classList.remove('show');
                 }
             }
+            updateFieldAlert(field);
 
             if (fieldName === 'is_event') {
-                const multiRadio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
                 if (status === 'wrong') {
                     lockValidation('not_event');
-                } else if (multiRadio && multiRadio.value === 'multiple') {
+                } else {
+                    unlockValidation();
+                }
+            } else if (fieldName === 'multi_event') {
+                const radio = field.querySelector('.multi-event-radio input:checked');
+                if (status === 'wrong' && radio && radio.value === 'multiple') {
                     lockValidation('multiple');
                 } else {
                     unlockValidation();
                 }
+                updateProgress();
             } else {
+                if (fieldName === 'place_type') updateIntersectionFields();
                 updateProgress();
             }
+        }
+
+        function onMultiEventCorrection(radio) {
+            const field = radio.closest('.validation-field');
+            if (radio.value === 'multiple') {
+                lockValidation('multiple');
+            } else {
+                unlockValidation();
+            }
+            updateFieldAlert(field);
+            updateProgress();
         }
 
         function setKIStatus(btn) {
@@ -580,6 +871,162 @@
             updateProgress();
         };
 
+        // Set status for single_places field (individual field within a place)
+        function setSPFieldStatus(btn, fieldName) {
+            const field = btn.closest('.validation-field');
+            const status = btn.dataset.status;
+
+            field.querySelectorAll('.field-status button').forEach(b => {
+                b.className = '';
+            });
+            btn.classList.add('active-' + status);
+            field.className = 'validation-field status-' + status;
+
+            const correction = field.querySelector('.field-correction');
+            if (correction) {
+                if (status === 'wrong') {
+                    correction.style.display = 'block';
+                    correction.classList.add('show');
+                    const input = correction.querySelector('input, textarea, select');
+                    if (input) input.focus();
+                    // Add change listeners to correction inputs to update progress
+                    correction.querySelectorAll('input, textarea, select').forEach(inp => {
+                        inp.addEventListener('change', updateProgress);
+                        inp.addEventListener('input', updateProgress);
+                        inp.addEventListener('input', () => updateFieldAlert(field));
+                        inp.addEventListener('change', () => updateFieldAlert(field));
+                        inp.addEventListener('focus', () => updateFieldAlert(field));
+                        inp.addEventListener('blur', () => setTimeout(() => updateFieldAlert(field), 0));
+                    });
+                } else {
+                    correction.style.display = 'none';
+                    correction.classList.remove('show');
+                }
+            }
+            updateFieldAlert(field);
+            updateProgress();
+        }
+
+        // Set status for entire single_places row (delete only)
+        function setSPStatus(btn, idx) {
+            const row = btn.closest('.sp-row');
+            const status = btn.dataset.status;
+            const isNew = row.dataset.added === '1';
+
+            if (status === 'deleted') {
+                row.querySelectorAll('.field-correction').forEach(c => {
+                    c.style.display = 'none';
+                    c.classList.remove('show');
+                });
+                row.querySelectorAll('.field-alert').forEach(a => a.remove());
+                if (isNew) {
+                    // New place: actually remove the row
+                    row.remove();
+                } else {
+                    // Existing place: toggle disabled/opaque state
+                    const isDisabled = row.classList.contains('sp-disabled');
+                    
+                    if (!isDisabled) {
+                        // First click: disable and make opaque
+                        row.classList.add('sp-disabled');
+                        row.querySelectorAll('.validation-field').forEach(f => {
+                            // Store previous validation state
+                            const activeBtn = f.querySelector('.field-status button[class*="active-"]');
+                            f.dataset.prevStatus = activeBtn ? activeBtn.dataset.status : '';
+                            
+                            // Clear validation buttons visual state
+                            f.querySelectorAll('.field-status button').forEach(b => {
+                                b.className = '';
+                                b.disabled = true;
+                            });
+                            // Disable inputs
+                            f.querySelectorAll('input, select, textarea').forEach(inp => {
+                                inp.disabled = true;
+                            });
+                            // Remove status classes
+                            f.className = f.className.replace(/status-\w+/, '');
+                        });
+                        btn.classList.add('active-deleted');
+                        btn.title = 'Restore place';
+                    } else {
+                        // Second click: restore previous state
+                        row.classList.remove('sp-disabled');
+                        row.querySelectorAll('.validation-field').forEach(f => {
+                            // Restore validation state
+                            const prevStatus = f.dataset.prevStatus;
+                            f.querySelectorAll('.field-status button').forEach(b => {
+                                b.className = '';
+                                b.disabled = false;
+                                if (b.dataset.status === prevStatus && prevStatus) {
+                                    b.classList.add('active-' + prevStatus);
+                                }
+                            });
+                            // Re-enable inputs
+                            f.querySelectorAll('input, select, textarea').forEach(inp => {
+                                inp.disabled = false;
+                            });
+                            // Restore status class
+                            if (prevStatus) {
+                                f.className = f.className.replace(/status-\w+/, '') + ' status-' + prevStatus;
+                            }
+                        });
+                        btn.classList.remove('active-deleted');
+                        btn.title = 'Remove place';
+                    }
+                }
+            }
+            updateProgress();
+        }
+
+        window.addSPField = function() {
+            const container = document.querySelector('.validation-fields');
+            const addBtn = container.querySelector('.sp-add-btn');
+            
+            // Find the highest existing sp-index to determine new index
+            let maxIdx = -1;
+            container.querySelectorAll('.sp-row').forEach(row => {
+                const idx = parseInt(row.dataset.spIndex) || 0;
+                if (idx > maxIdx) maxIdx = idx;
+            });
+            const newIdx = maxIdx + 1;
+            const placePrefix = 'single_places[' + newIdx + ']';
+            
+            const row = document.createElement('div');
+            row.className = 'sp-row';
+            row.dataset.spIndex = newIdx;
+            row.dataset.added = '1';
+            
+            // Build fields for the new place
+            const fieldsHtml = [
+                renderSPField(placePrefix + '.specific_name_place', 'Specific name place', '', {}, '', 'text', '', null, true),
+                renderSPField(placePrefix + '.address', 'Address', '', {}, '', 'text', '', null, true),
+                renderSPField(placePrefix + '.city', 'City', '', {}, '', 'text', '', null, true),
+                renderSPField(placePrefix + '.county', 'County', '', {}, '', 'text', '', null, true),
+                renderSPField(placePrefix + '.hamlet', 'Hamlet', '', {}, '', 'text', '', null, true),
+                renderSPField(placePrefix + '.urban_zone', 'Urban Zone', '', {}, '', 'text', '', null, true),
+                renderSPField(placePrefix + '.latitude', 'Latitude', '', {}, '', 'number', 'step="0.0000001"', null, true),
+                renderSPField(placePrefix + '.longitude', 'Longitude', '', {}, '', 'number', 'step="0.0000001"', null, true),
+                renderSPField(placePrefix + '.osm_type', 'OSM Type', '', {}, '', 'select', '', ['node', 'way', 'relation'], true),
+                renderSPField(placePrefix + '.osm_id', 'OSM ID', '', {}, '', 'number', 'step="1" min="0"', null, true)
+            ].join('');
+            
+            row.innerHTML = 
+                '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">' +
+                '  <strong style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--text-muted);text-transform:uppercase;min-width:140px;">Place #' + (newIdx + 1) + '</strong>' +
+                '  <div class="sp-status" style="display:flex;gap:3px;">' +
+                '    <button type="button" class="btn-delete" data-status="deleted" title="Remove place" onclick="setSPStatus(this, ' + newIdx + ')"><i class="fas fa-trash"></i></button>' +
+                '  </div>' +
+                '</div>' +
+                fieldsHtml;
+            
+            container.insertBefore(row, addBtn);
+            row.querySelectorAll('.sp-field-input, .new-field-none-check').forEach(inp => {
+                inp.addEventListener('input', updateProgress);
+                inp.addEventListener('change', updateProgress);
+            });
+            updateProgress();
+        };
+
         function getDateParts(event) {
             const parts = [];
             for (const prefix of ['start_date', 'end_date']) {
@@ -590,11 +1037,26 @@
             return parts;
         }
 
+        // Read a saved field state, supporting nested start_date/end_date and
+        // geocoded_intersection objects (new format) with fallback to flat
+        // "start_date.day" / "geocoded_intersection.latitude" keys (legacy format)
+        function getSavedFieldState(savedFields, f) {
+            if (!savedFields) return undefined;
+            let dm = f.match(/^(start_date|end_date)\.(day|month|year)$/);
+            if (!dm) dm = f.match(/^(geocoded_intersection)\.(latitude|longitude)$/);
+            if (dm) {
+                const nested = savedFields[dm[1]] && savedFields[dm[1]][dm[2]];
+                if (nested) return nested;
+            }
+            return savedFields[f];
+        }
+
         function getAllFieldNames(event) {
             const dateParts = getDateParts(event);
             const metaFields = [
-                'is_event', 'category', 'extracted_place',
-                'county', 'street', 'loc_description'
+                'is_event', 'category',
+                'single_places[0].address', 'single_places[0].city', 'single_places[0].county', 'single_places[0].hamlet', 'single_places[0].urban_zone',
+                'single_places[0].latitude', 'single_places[0].longitude', 'single_places[0].osm_type', 'single_places[0].osm_id'
             ];
             const keyInfoFields = Object.keys(event.key_info || {}).map(k => 'key_info.' + k);
             return [...dateParts, ...metaFields, ...keyInfoFields];
@@ -604,9 +1066,17 @@
             const state = {};
             document.querySelectorAll('.validation-field').forEach(el => {
                 const name = el.dataset.field;
+                if (el.dataset.insert === '1') {
+                    const input = el.querySelector('.sp-field-input');
+                    const raw = input?.value?.trim() || '';
+                    state[name] = { value: null, status: 'inserted', correction: raw !== '' ? Number(raw) : null };
+                    return;
+                }
                 const activeBtn = el.querySelector('.field-status button[class*="active-"]');
                 if (!activeBtn) return;
                 const status = activeBtn.dataset.status;
+
+                if (!status) return;
 
                 let correction = null;
                 if (name === 'is_event' && status === 'wrong') {
@@ -625,27 +1095,197 @@
                 } else if (name.match(/^(start_date|end_date)\.(day|month|year)$/) && status === 'wrong') {
                     const noneCheck = el.querySelector('.correction-none-check');
                     if (noneCheck?.checked) {
-                        correction = '__none__';
+                        correction = null;
                     } else {
                         const numInput = el.querySelector('.correction-date-input');
                         const val = numInput?.value?.trim();
-                        correction = val || null;
+                        correction = (val && val !== '__none__') ? val : null;
                     }
-                } else if (name === 'osm_type' && status === 'wrong') {
+                } else if ((name === 'osm_type' || name === 'single_places[0].osm_type') && status === 'wrong') {
                     const sel = el.querySelector('.correction-osm-type');
                     const v = sel?.value?.trim();
                     correction = v || null;
+                } else if ((name === 'osm_id' || name === 'single_places[0].osm_id') && status === 'wrong') {
+                    const numInput = el.querySelector('.correction-osm-id');
+                    const v = numInput?.value?.trim();
+                    correction = v || null;
+                } else if (name === 'multi_event') {
+                    const radio = el.querySelector('.multi-event-radio input:checked');
+                    correction = radio ? radio.value : null;
                 } else {
-                    const correctionInput = el.querySelector('.field-correction input, .field-correction textarea');
-                    const val = correctionInput?.value?.trim() || '';
-                    correction = val || null;
+                    // Check for None checkbox for SP number fields
+                    const noneCheck = el.querySelector('.correction-none-check');
+                    if (noneCheck && noneCheck.checked) {
+                        correction = null;
+                    } else {
+                        const correctionInput = el.querySelector('.field-correction input, .field-correction textarea, .correction-sp-field');
+                        const val = correctionInput?.value?.trim() || '';
+                        correction = (val && val !== '__none__') ? val : null;
+                    }
                 }
 
-                state[name] = { status, correction };
+                const event = getEvent();
+                let originalValue = null;
+                if (event) {
+                    if (name.includes('[')) {
+                        const match = name.match(/^(.+?)\[(\d+)\]\.(.+)$/);
+                        if (match) {
+                            const [, arrName, idx, key] = match;
+                            const arr = event[arrName];
+                            if (arr && arr[idx]) {
+                                originalValue = getVal(arr[idx][key]);
+                            }
+                        }
+                    } else if (name.includes('.')) {
+                        const [obj, key] = name.split('.');
+                        if (event[obj]) {
+                            originalValue = getVal(event[obj][key]);
+                        }
+                    } else {
+                        originalValue = getVal(event[name]);
+                    }
+                }
+
+                state[name] = {
+                    value: originalValue,
+                    status,
+                    correction
+                };
+            });
+
+            // Restructure single_places from flat keys to array
+            const singlePlacesMap = {};
+            Object.keys(state).forEach(key => {
+                const match = key.match(/^single_places\[(\d+)\]\.(.+)$/);
+                if (match) {
+                    const [, idx, field] = match;
+                    if (!singlePlacesMap[idx]) singlePlacesMap[idx] = {};
+                    singlePlacesMap[idx][field] = state[key];
+                    delete state[key];
+                }
+            });
+            if (Object.keys(singlePlacesMap).length > 0) {
+                state.single_places = Object.keys(singlePlacesMap)
+                    .sort((a, b) => parseInt(a) - parseInt(b))
+                    .map(idx => singlePlacesMap[idx]);
+            }
+
+            // Restructure date parts into nested objects: start_date: { day, month, year }
+            ['start_date', 'end_date'].forEach(prefix => {
+                const dayKey = prefix + '.day';
+                const monthKey = prefix + '.month';
+                const yearKey = prefix + '.year';
+                if (state[dayKey] !== undefined || state[monthKey] !== undefined || state[yearKey] !== undefined) {
+                    state[prefix] = {
+                        day: state[dayKey] !== undefined ? state[dayKey] : null,
+                        month: state[monthKey] !== undefined ? state[monthKey] : null,
+                        year: state[yearKey] !== undefined ? state[yearKey] : null
+                    };
+                    delete state[dayKey];
+                    delete state[monthKey];
+                    delete state[yearKey];
+                }
+            });
+
+            // Restructure geocoded_intersection into a nested object: { latitude, longitude }
+            const giLatKey = 'geocoded_intersection.latitude';
+            const giLngKey = 'geocoded_intersection.longitude';
+            if (state[giLatKey] !== undefined || state[giLngKey] !== undefined) {
+                state.geocoded_intersection = {
+                    latitude: state[giLatKey] !== undefined ? state[giLatKey] : null,
+                    longitude: state[giLngKey] !== undefined ? state[giLngKey] : null
+                };
+                delete state[giLatKey];
+                delete state[giLngKey];
+            }
+
+            // Collect single_places rows (sp-row)
+            document.querySelectorAll('.sp-row').forEach(row => {
+                const idx = parseInt(row.dataset.spIndex) || 0;
+                const isNew = row.dataset.added === '1';
+                const deleted = row.classList.contains('status-deleted');
+                const isDisabled = row.classList.contains('sp-disabled');
+                
+                if (deleted && isNew) {
+                    // New place that was deleted - don't include in state (removed)
+                    return;
+                }
+                if (deleted && !isNew) {
+                    // Existing place marked as deleted -> record as "wrong"
+                    // The flat keys will be restructured, so mark them with status: wrong
+                    return;
+                }
+                if (isDisabled) {
+                    // Existing place marked as disabled
+                    return;
+                }
+                // Collect field-level data for this place
+                const placeFields = {};
+                row.querySelectorAll('.validation-field[data-field]').forEach(el => {
+                    const fieldName = el.dataset.field;
+                    const activeBtn = el.querySelector('.field-status button[class*="active-"]');
+                    let status;
+                    let correction = null;
+                    if (!activeBtn) {
+                        // Newly added place field — validate via its own input / None checkbox
+                        if (!isNew) return;
+                        const noneCheck = el.querySelector('.new-field-none-check');
+                        const input = el.querySelector('.sp-field-input');
+                        if (noneCheck && noneCheck.checked) {
+                            status = 'correct';
+                            correction = null;
+                        } else {
+                            const v = input?.value?.trim() || '';
+                            status = 'correct';
+                            correction = v || null;
+                        }
+                    } else {
+                        status = activeBtn.dataset.status;
+                        if (status === 'wrong') {
+                            const noneCheck = el.querySelector('.correction-none-check');
+                            if (noneCheck && noneCheck.checked) {
+                                correction = null;
+                            } else {
+                                const correctionInput = el.querySelector('.correction-sp-field');
+                                const v = correctionInput?.value?.trim() || '';
+                                correction = (v && v !== '__none__') ? v : null;
+                            }
+                        }
+                    }
+                    const event = getEvent();
+                    let originalValue = null;
+                    if (event) {
+                        if (fieldName.includes('[')) {
+                            const match = fieldName.match(/^(.+?)\[(\d+)\]\.(.+)$/);
+                            if (match) {
+                                const [, arrName, idx, key] = match;
+                                const arr = event[arrName];
+                                if (arr && arr[idx]) {
+                                    originalValue = getVal(arr[idx][key]);
+                                }
+                            }
+                        }
+                    }
+                    // Extract just the field name without index prefix (e.g., "address" from "single_places[1].address")
+                    const fieldKey = fieldName.includes('[') 
+                        ? fieldName.replace(/^single_places\[\d+\]\./, '')
+                        : fieldName;
+                    placeFields[fieldKey] = {
+                        value: originalValue,
+                        status,
+                        correction
+                    };
+                });
+                if (Object.keys(placeFields).length > 0) {
+                    const targetKey = isNew ? '_added_single_places' : '_single_places';
+                    state[targetKey] = state[targetKey] || [];
+                    state[targetKey][idx] = { fields: placeFields };
+                }
             });
 
             // Collect key info rows
             const addedFields = [];
+            const keyInfoState = {};
             document.querySelectorAll('.ki-row').forEach(row => {
                 const fieldName = row.dataset.kiField || '';
                 const keyInput = row.querySelector('.ki-key');
@@ -661,7 +1301,7 @@
                 const deleted = row.classList.contains('status-deleted');
                 if (deleted) {
                     if (fieldName && !fieldName.includes('__new_')) {
-                        state[fieldName] = { status: 'deleted', correction: null, corrected_key: null, deleted: true };
+                        keyInfoState[fieldName.replace('key_info.', '')] = { status: 'deleted', correction: null, corrected_key: null, deleted: true };
                     }
                     return;
                 }
@@ -669,44 +1309,45 @@
                 const status = activeBtn.dataset.status;
                 if (status === 'correct') {
                     if (fieldName && !fieldName.includes('__new_')) {
-                        state[fieldName] = { status: 'correct', correction: null, corrected_key: null, deleted: false };
+                        keyInfoState[fieldName.replace('key_info.', '')] = { status: 'correct', correction: null, corrected_key: null, deleted: false };
                     } else if (fieldName && fieldName.includes('__new_')) {
                         if (key) addedFields.push({ key, value });
                     }
                 } else if (status === 'wrong') {
                     if (fieldName && !fieldName.includes('__new_')) {
                         const correctedKey = key !== fieldName.replace('key_info.', '') ? key : null;
-                        state[fieldName] = { status: 'wrong', correction: value || null, corrected_key: correctedKey, deleted: false };
+                        keyInfoState[fieldName.replace('key_info.', '')] = { status: 'wrong', correction: value || null, corrected_key: correctedKey, deleted: false };
                     } else if (fieldName && fieldName.includes('__new_')) {
                         if (key) addedFields.push({ key, value });
                     }
                 }
             });
+            if (Object.keys(keyInfoState).length > 0) {
+                state.key_info = keyInfoState;
+            }
             if (addedFields.length > 0) {
                 state['_added_key_info'] = addedFields;
             }
 
-            // Vincolate coordinates.lat + coordinates.lng into a single coordinates object
-            const lat = state['coordinates.lat'];
-            const lng = state['coordinates.lng'];
-            if (lat && lng && lat.correction && lng.correction) {
-                state['coordinates'] = {
-                    status: 'wrong',
-                    correction: { lat: parseFloat(lat.correction), lng: parseFloat(lng.correction) }
-                };
-                delete state['coordinates.lat'];
-                delete state['coordinates.lng'];
-            } else if (lat && lat.correction) {
-                delete state['coordinates.lat'];
-            } else if (lng && lng.correction) {
-                delete state['coordinates.lng'];
+            // Handle single_places[N].latitude + single_places[N].longitude for all indices
+            for (let idx = 0; idx < 10; idx++) {
+                const lat = state['single_places[' + idx + '].latitude'];
+                const lng = state['single_places[' + idx + '].longitude'];
+                if (lat && lng && lat.correction && lng.correction) {
+                    state['single_places[' + idx + '].coordinates'] = {
+                        status: 'wrong',
+                        correction: { lat: parseFloat(lat.correction), lng: parseFloat(lng.correction) }
+                    };
+                    delete state['single_places[' + idx + '].latitude'];
+                    delete state['single_places[' + idx + '].longitude'];
+                } else if (lat && lat.correction) {
+                    delete state['single_places[' + idx + '].latitude'];
+                } else if (lng && lng.correction) {
+                    delete state['single_places[' + idx + '].longitude'];
+                }
             }
 
-            // Handle multi_event radio (not a .validation-field)
-            const multiRadio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
-            if (multiRadio) {
-                state['multi_event'] = { status: multiRadio.value, correction: multiRadio.value };
-            }
+            // multi_event is now a validation field, handled above
 
             return state;
         }
@@ -721,24 +1362,40 @@
         }
 
         function isValidationLocked() {
-            const radio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
-            if (radio && radio.value === 'multiple') return true;
+            const multiEventField = document.querySelector('.validation-field[data-field="multi_event"]');
+            const multiEventStatus = multiEventField ? multiEventField.querySelector('.field-status button[class*="active-"]') : null;
+            if (multiEventStatus && multiEventStatus.dataset.status === 'wrong') {
+                const radio = multiEventField.querySelector('.multi-event-radio input:checked');
+                if (radio && radio.value === 'multiple') return true;
+            }
             return isNotEvent();
         }
 
         function lockReason() {
-            const radio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
-            if (radio && radio.value === 'multiple') return 'Multiple events, no predominant — other validations disabled';
+            const multiEventField = document.querySelector('.validation-field[data-field="multi_event"]');
+            const multiEventStatus = multiEventField ? multiEventField.querySelector('.field-status button[class*="active-"]') : null;
+            if (multiEventStatus && multiEventStatus.dataset.status === 'wrong') {
+                const radio = multiEventField.querySelector('.multi-event-radio input:checked');
+                if (radio && radio.value === 'multiple') return 'Multiple events, no predominant — other validations disabled';
+            }
             if (isNotEvent()) return 'Not an event — other validations disabled';
             return 'Validation disabled';
         }
 
         function allFieldsValidated() {
+            if (updatePlacesWarning()) return false;
             if (isValidationLocked()) return true;
             const fields = document.querySelectorAll('.validation-field');
             for (const el of fields) {
+                if (el.closest('.sp-row')) continue;
+                if (el.dataset.insert === '1') {
+                    const input = el.querySelector('.sp-field-input');
+                    if (!input || !input.value || String(input.value).trim() === '') return false;
+                    continue;
+                }
                 const activeBtn = el.querySelector('.field-status button[class*="active-"]');
                 if (!activeBtn) return false;
+                if (!isWrongFieldComplete(el)) return false;
             }
             const kiRows = document.querySelectorAll('.ki-row:not([data-added="1"])');
             for (const row of kiRows) {
@@ -746,48 +1403,321 @@
                 const activeBtn = row.querySelector('.ki-status button[class*="active-"]');
                 if (!activeBtn) return false;
             }
-            const multiRadio = document.querySelector('.multi-event-radio input[name="multi_event_radio"]:checked');
-            if (!multiRadio) return false;
+            const spRows = document.querySelectorAll('.sp-row');
+            for (const row of spRows) {
+                if (row.classList.contains('sp-disabled') || row.classList.contains('status-deleted')) continue;
+                const placeFields = row.querySelectorAll('.validation-field');
+                let allDone = true;
+                for (const f of placeFields) {
+                    if (row.dataset.added === '1') {
+                        if (!isAddedFieldComplete(f)) { allDone = false; break; }
+                        continue;
+                    }
+                    const activeBtn = f.querySelector('.field-status button[class*="active-"]');
+                    if (!activeBtn) { allDone = false; break; }
+                    if (!isWrongFieldComplete(f)) { allDone = false; break; }
+                }
+                if (!allDone) return false;
+            }
             return true;
         }
 
+        function isWrongFieldComplete(el) {
+            const activeBtn = el.querySelector('.field-status button[class*="active-"]');
+            if (!activeBtn || activeBtn.dataset.status !== 'wrong') return true;
+            const fieldName = el.dataset.field;
+            if (fieldName === 'is_event') return true;
+            const correctionDiv = el.querySelector('.field-correction');
+            if (!correctionDiv || correctionDiv.style.display === 'none') return false;
+            if (fieldName === 'multi_event') {
+                return !!correctionDiv.querySelector('.multi-event-radio input:checked');
+            }
+            if (fieldName === 'category') {
+                const sel = correctionDiv.querySelector('.correction-category');
+                if (sel && sel.value === '__other__') {
+                    const other = correctionDiv.querySelector('.correction-category-other');
+                    return !!(other && other.value.trim() !== '');
+                }
+                return !!(sel && sel.value && sel.value.trim() !== '');
+            }
+            const noneCheck = correctionDiv.querySelector('.correction-none-check');
+            const isNone = noneCheck && noneCheck.checked;
+            const inputs = correctionDiv.querySelectorAll('input:not(.correction-none-check), select, textarea');
+            const hasCorrection = Array.from(inputs).some(inp => inp.value && String(inp.value).trim() !== '');
+            return hasCorrection || !!isNone;
+        }
+
+        // A newly added place field is complete when its input has a value or None is checked
+        function isAddedFieldComplete(el) {
+            const noneCheck = el.querySelector('.new-field-none-check');
+            if (noneCheck && noneCheck.checked) return true;
+            const input = el.querySelector('.sp-field-input');
+            return !!(input && input.value && String(input.value).trim() !== '');
+        }
+
+        // Show/hide an inline reminder when a field is marked wrong but left uncorrected
+        function updateFieldAlert(field) {
+            const activeBtn = field.querySelector('.field-status button[class*="active-"]');
+            const isWrong = activeBtn && activeBtn.dataset.status === 'wrong';
+            const correctionDiv = field.querySelector('.field-correction');
+            const existing = field.querySelector('.field-alert');
+
+            const shouldShow = isWrong && correctionDiv &&
+                !isWrongFieldComplete(field) &&
+                !correctionDiv.contains(document.activeElement);
+
+            if (!shouldShow) {
+                if (existing) existing.remove();
+                return;
+            }
+            if (!existing) {
+                const alert = document.createElement('div');
+                alert.className = 'field-alert';
+                const hasNone = correctionDiv.querySelector('.correction-none-check');
+                const hasRadios = correctionDiv.querySelector('.multi-event-radio input[type="radio"]');
+                const msg = hasRadios
+                    ? 'Please select the corrected value.'
+                    : hasNone
+                        ? 'Please insert the correction or check "Null".'
+                        : 'Please insert the correction.';
+                alert.innerHTML = '<i class="fas fa-triangle-exclamation"></i> ' + msg;
+                correctionDiv.appendChild(alert);
+            }
+        }
+
+        function getEffectivePlaceType() {
+            const event = getEvent();
+            if (!event) return 'single';
+            let effective = getVal(event.place_type) || event.place_type || 'single';
+            const ptField = document.querySelector('.validation-field[data-field="place_type"]');
+            if (ptField) {
+                const activeBtn = ptField.querySelector('.field-status button[class*="active-"]');
+                if (activeBtn && activeBtn.dataset.status === 'wrong') {
+                    const sel = ptField.querySelector('.correction-sp-field');
+                    if (sel && sel.value) effective = sel.value;
+                }
+            }
+            return effective;
+        }
+
+        // "validate": the intersection coords already exist in the JSON -> validate with correct/wrong
+        // "insert": place type was corrected to intersection -> the coords only need to be inserted
+        function intersectionMode() {
+            if (getEffectivePlaceType() !== 'intersection') return null;
+            const event = getEvent();
+            const gi = (event && event.geocoded_intersection) || {};
+            return (gi.latitude != null || gi.longitude != null) ? 'validate' : 'insert';
+        }
+
+        function renderIntersectionInsert(name, label) {
+            const saved = getSavedFieldState(savedFieldsCache, name);
+            const val = (saved && saved.correction != null) ? String(saved.correction) : '';
+            return `
+                <div class="validation-field" data-field="${name}" data-insert="1" style="margin:4px 0 4px 148px;">
+                    <div class="field-row">
+                        <div class="field-info">
+                            <div class="field-name">${label}</div>
+                            <div class="field-value">
+                                <div class="new-field-wrap">
+                                    <input type="number" step="0.0000001" class="sp-field-input" placeholder="${label}" value="${val}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateIntersectionFields() {
+            const container = document.getElementById('intersectionFields');
+            if (!container) return;
+            const mode = intersectionMode();
+            let changed = false;
+
+            if (!mode) {
+                if (container.innerHTML !== '') {
+                    container.innerHTML = '';
+                    container.dataset.mode = '';
+                    changed = true;
+                }
+            } else if (!(container.dataset.mode === mode && container.querySelector('.validation-field'))) {
+                const event = getEvent();
+                const gi = (event && event.geocoded_intersection) || {};
+                let html = '<div class="section-header"><i class="fas fa-location-crosshairs"></i> Intersection Coordinates</div>';
+
+                if (mode === 'validate') {
+                    html += renderField('geocoded_intersection.latitude', getVal(gi.latitude), getSavedFieldState(savedFieldsCache, 'geocoded_intersection.latitude'));
+                    html += renderField('geocoded_intersection.longitude', getVal(gi.longitude), getSavedFieldState(savedFieldsCache, 'geocoded_intersection.longitude'));
+                } else {
+                    html += renderIntersectionInsert('geocoded_intersection.latitude', 'Latitude');
+                    html += renderIntersectionInsert('geocoded_intersection.longitude', 'Longitude');
+                }
+
+                container.innerHTML = html;
+                container.dataset.mode = mode;
+                changed = true;
+
+                if (mode === 'insert') {
+                    container.querySelectorAll('.sp-field-input').forEach(inp => {
+                        inp.addEventListener('input', updateProgress);
+                        inp.addEventListener('change', updateProgress);
+                    });
+                }
+            }
+
+            if (changed) updateProgress();
+        }
+
+        // Green border when an inserted intersection coordinate is filled, plus
+        // an inline alert while it is still empty.
+        function updateIntersectionInsertFields() {
+            const container = document.getElementById('intersectionFields');
+            if (!container) return;
+            container.querySelectorAll('.validation-field[data-insert="1"]').forEach(field => {
+                const input = field.querySelector('.sp-field-input');
+                const filled = !!(input && input.value && String(input.value).trim() !== '');
+                field.classList.toggle('status-correct', filled);
+                let alert = field.querySelector('.field-alert');
+                if (filled) {
+                    if (alert) alert.remove();
+                    return;
+                }
+                if (!alert) {
+                    const name = field.dataset.field || '';
+                    const label = name.endsWith('latitude') ? 'latitude' : 'longitude';
+                    alert = document.createElement('div');
+                    alert.className = 'field-alert';
+                    alert.innerHTML = '<i class="fas fa-triangle-exclamation"></i> Please insert the ' + label + ' to complete.';
+                    field.appendChild(alert);
+                }
+            });
+        }
+
+        // Green border when an added place field is filled (or Null checked),
+        // plus an inline alert while it is still empty.
+        function updateAddedPlaceFieldStates() {
+            document.querySelectorAll('.sp-row[data-added="1"] .validation-field').forEach(field => {
+                const complete = isAddedFieldComplete(field);
+                field.classList.toggle('status-correct', complete);
+                let alert = field.querySelector('.field-alert');
+                if (complete) {
+                    if (alert) alert.remove();
+                    return;
+                }
+                if (!alert) {
+                    alert = document.createElement('div');
+                    alert.className = 'field-alert';
+                    alert.innerHTML = '<i class="fas fa-triangle-exclamation"></i> Please insert the value or check "Null".';
+                    field.appendChild(alert);
+                }
+            });
+        }
+
+        function updatePlacesWarning() {
+            const warnEl = document.getElementById('placesWarning');
+            if (!warnEl) return false;
+            const event = getEvent();
+            if (!event) { warnEl.style.display = 'none'; return false; }
+
+            const effective = getEffectivePlaceType();
+
+            let count = 0;
+            document.querySelectorAll('.sp-row').forEach(row => {
+                if (row.classList.contains('sp-disabled') || row.classList.contains('status-deleted')) return;
+                count++;
+            });
+
+            let invalid = false;
+            let msg = '';
+            const places = count + ' place' + (count === 1 ? ' is' : 's are');
+            if (effective === 'single' && count !== 1) {
+                invalid = true;
+                msg = 'This event is set to a single place, but ' + places + ' present. Adjust the places or change the place type.';
+            } else if (effective === 'intersection' && count !== 2) {
+                invalid = true;
+                msg = 'This event is set to an intersection, which requires exactly two places, but ' + places + ' present. Adjust the places or change the place type.';
+            } else if (effective === 'multiple' && count < 2) {
+                invalid = true;
+                msg = 'This event is set to multiple places, but ' + places + ' present. Add another place or change the place type.';
+            }
+            if (invalid) {
+                warnEl.innerHTML = '<i class="fas fa-triangle-exclamation"></i> ' + msg;
+                warnEl.style.display = 'flex';
+            } else {
+                warnEl.style.display = 'none';
+            }
+            return invalid;
+        }
+
         function updateProgress() {
+            updateIntersectionInsertFields();
+            updateAddedPlaceFieldStates();
+            const placesInvalid = updatePlacesWarning();
             if (isValidationLocked()) {
                 document.getElementById('progressFill').style.width = '100%';
                 document.getElementById('progressText').textContent = lockReason();
                 document.querySelectorAll('.btn-save-validation').forEach(saveBtn => {
-                    saveBtn.disabled = false;
-                    saveBtn.style.opacity = '1';
-                    saveBtn.style.cursor = 'pointer';
+                    saveBtn.disabled = placesInvalid;
+                    saveBtn.style.opacity = placesInvalid ? '0.5' : '1';
+                    saveBtn.style.cursor = placesInvalid ? 'not-allowed' : 'pointer';
                 });
                 return;
             }
             const fields = document.querySelectorAll('.validation-field');
             const kiRows = document.querySelectorAll('.ki-row:not([data-added="1"])');
-            const multiRadio = document.querySelector('.multi-event-radio');
-            const total = fields.length + kiRows.length + (multiRadio ? 1 : 0);
-            if (total === 0) return;
+            const spRows = document.querySelectorAll('.sp-row');
+            let total = 0;
             let done = 0;
             fields.forEach(el => {
+                if (el.closest('.sp-row')) return;
+                total++;
+                if (el.dataset.insert === '1') {
+                    const input = el.querySelector('.sp-field-input');
+                    if (input && input.value && String(input.value).trim() !== '') done++;
+                    return;
+                }
                 const activeBtn = el.querySelector('.field-status button[class*="active-"]');
-                if (activeBtn) done++;
+                if (activeBtn && isWrongFieldComplete(el)) done++;
             });
             kiRows.forEach(row => {
+                total++;
                 if (row.classList.contains('status-deleted')) { done++; return; }
                 const activeBtn = row.querySelector('.ki-status button[class*="active-"]');
                 if (activeBtn) done++;
             });
-            if (multiRadio && multiRadio.querySelector('input[name="multi_event_radio"]:checked')) done++;
+            spRows.forEach(row => {
+                // Count each field in the place
+                const placeFields = row.querySelectorAll('.validation-field');
+                if (row.classList.contains('sp-disabled') || row.classList.contains('status-deleted')) {
+                    // Existing place disabled/deleted — its fields are considered satisfied
+                    total += placeFields.length;
+                    done += placeFields.length;
+                    return;
+                }
+                if (row.dataset.added === '1') {
+                    // Added place — each field must be filled or marked None
+                    placeFields.forEach(f => {
+                        total++;
+                        if (isAddedFieldComplete(f)) done++;
+                    });
+                    return;
+                }
+                placeFields.forEach(f => {
+                    total++;
+                    const activeBtn = f.querySelector('.field-status button[class*="active-"]');
+                    if (activeBtn && isWrongFieldComplete(f)) done++;
+                });
+            });
             const pct = Math.round((done / total) * 100);
             document.getElementById('progressFill').style.width = pct + '%';
             document.getElementById('progressText').textContent = `${done} / ${total} fields validated`;
 
-            const saveBtn = document.querySelector('.btn-save-validation');
-            if (saveBtn) {
-                saveBtn.disabled = done < total;
-                saveBtn.style.opacity = done < total ? '0.5' : '1';
-                saveBtn.style.cursor = done < total ? 'not-allowed' : 'pointer';
-            }
+            const blocked = done < total || placesInvalid;
+            document.querySelectorAll('.btn-save-validation').forEach(saveBtn => {
+                saveBtn.disabled = blocked;
+                saveBtn.style.opacity = blocked ? '0.5' : '1';
+                saveBtn.style.cursor = blocked ? 'not-allowed' : 'pointer';
+            });
         }
 
         async function render() {
@@ -812,12 +1742,12 @@
             const fields = getAllFieldNames(event);
             const keyInfoFields = fields.filter(f => f.startsWith('key_info.'));
 
+            const firstPlace = event.single_places?.[0] || {};
+            
             const groups = [
                 { label: '<i class="fas fa-tag"></i> General', keys: ['is_event', 'category', 'multi_event'] },
                 { label: '<i class="fas fa-calendar"></i> Start Date', keys: ['start_date.day', 'start_date.month', 'start_date.year'] },
                 { label: '<i class="fas fa-calendar-check"></i> End Date', keys: ['end_date.day', 'end_date.month', 'end_date.year'] },
-                { label: '<i class="fas fa-map-pin"></i> Location', keys: ['extracted_place', 'county', 'street', 'loc_description'] },
-                { label: '<i class="fas fa-globe"></i> Geolocation', keys: ['coordinates.lat', 'coordinates.lng', 'osm_type', 'osm_id'] },
             ];
             const totalFields = groups.reduce((s, g) => s + g.keys.length, 0) + keyInfoFields.length;
 
@@ -831,6 +1761,7 @@
             } catch (e) {}
 
             const savedFields = savedState?.fields || {};
+            savedFieldsCache = savedFields;
 
             container.innerHTML = `
                 <div class="validation-meta" style="grid-template-columns:1fr 1fr 1fr;">
@@ -865,31 +1796,89 @@
                             for (const f of group.keys) {
                                 let val;
                                 if (f === 'multi_event') {
-                                    const savedVal = savedFields[f];
-                                    const savedStatus = savedVal?.status || '';
-                                    const cls = savedStatus === 'multiple' ? 'multi-event-radio disabled-others' : 'multi-event-radio';
-                                    html += '<div class="' + cls + '" id="multiEventBox">';
-                                    html += '  <div class="field-name" style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Event type</div>';
-                                    html += '  <div class="radio-group" data-field="multi_event">';
-                                    html += '    <label data-value="single" class="' + (savedStatus === 'single' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="single" ' + (savedStatus === 'single' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-circle"></i> Single event</label>';
-                                    html += '    <label data-value="main_secondary" class="' + (savedStatus === 'main_secondary' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="main_secondary" ' + (savedStatus === 'main_secondary' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-star"></i> Main event with secondary events</label>';
-                                    html += '    <label data-value="multiple" class="' + (savedStatus === 'multiple' ? 'selected' : '') + '"><input type="radio" name="multi_event_radio" value="multiple" ' + (savedStatus === 'multiple' ? 'checked' : '') + ' onchange="onMultiEventChange(this)"> <i class="fas fa-layer-group"></i> Multiple events, no predominant</label>';
-                                    html += '  </div>';
-                                    html += '</div>';
-                                    continue;
+                                    val = event.multi_event || 'single';
                                 }
-                                if (f.includes('.')) {
+                                if (f.includes('[')) {
+                                    const match = f.match(/^(.+?)\[(\d+)\]\.(.+)$/);
+                                    if (match) {
+                                        const [, arrName, idx, key] = match;
+                                        const arr = event[arrName];
+                                        val = arr && arr[idx] ? getVal(arr[idx][key]) : null;
+                                    }
+                                } else if (f.includes('.')) {
                                     const [obj, key] = f.split('.');
-                                    val = event[obj] ? event[obj][key] : null;
-                                } else {
-                                    val = event[f];
+                                    val = event[obj] ? getVal(event[obj][key]) : null;
+                                } else if (val === undefined) {
+                                    val = getVal(event[f]);
                                 }
-                                html += renderField(f, val, savedFields[f]);
+                                html += renderField(f, val, getSavedFieldState(savedFields, f));
                             }
                         }
+html += '<div class="section-header"><i class="fas fa-map-marker-alt"></i> Locations</div>';
+                        html += renderField('place_type', event.place_type || 'single', savedFields.place_type);
+                        html += '<div id="placesWarning" class="places-warning" style="display:none;"></div>';
+                        const places = event.single_places || [];
+                        const savedPlaces = savedFields._single_places || [];
+                        places.forEach((place, idx) => {
+                            const savedPlace = savedPlaces[idx] || {};
+                            const placePrefix = 'single_places[' + idx + ']';
+                            const isDeleted = savedPlace.deleted === true;
+                            const cls = isDeleted ? 'sp-row status-deleted' : (savedPlace.status === 'correct' ? 'sp-row status-correct' : (savedPlace.status === 'wrong' ? 'sp-row status-wrong' : 'sp-row'));
+                            const dis = isDeleted ? 'disabled' : '';
+                            
+                            const specificNameVal = getVal(place.specific_name_place);
+                            const addressVal = getVal(place.address);
+                            const cityVal = getVal(place.city);
+                            const countyVal = getVal(place.county);
+                            const hamletVal = getVal(place.hamlet);
+                            const urbanZoneVal = getVal(place.urban_zone);
+                            const latVal = getVal(place.latitude);
+                            const lngVal = getVal(place.longitude);
+                            const osmTypeVal = getVal(place.osm_type);
+                            const osmIdVal = getVal(place.osm_id);
+                            
+                            // Get provenance from original event data
+                            const specificNameProv = getProv(place.specific_name_place);
+                            const addressProv = getProv(place.address);
+                            const cityProv = getProv(place.city);
+                            const countyProv = getProv(place.county);
+                            const hamletProv = getProv(place.hamlet);
+                            const urbanZoneProv = getProv(place.urban_zone);
+                            const latProv = getProv(place.latitude);
+                            const lngProv = getProv(place.longitude);
+                            const osmTypeProv = getProv(place.osm_type);
+                            const osmIdProv = getProv(place.osm_id);
+                            
+                            // Each place in its own subsection with delete button
+                            html += '<div class="' + cls + '" data-sp-index="' + idx + '">';
+                            html += '  <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">';
+                            html += '    <div class="section-header" style="margin:0;padding:0;flex:1;"><i class="fas fa-map-marker"></i> Place #' + (idx + 1) + '</div>';
+                            html += '    <div class="sp-status" style="display:flex;gap:3px;">';
+                            html += '      <button type="button" class="' + (isDeleted ? 'active-deleted' : 'btn-delete') + '" data-status="deleted" title="Remove place" onclick="setSPStatus(this, ' + idx + ')"><i class="fas fa-trash"></i></button>';
+                            html += '    </div>';
+                            html += '  </div>';
+                            
+                            // Address field
+                            html += renderSPField(placePrefix + '.specific_name_place', 'Specific name place', specificNameVal, savedPlace.specific_name_place, dis, 'text', '', null, false, specificNameProv);
+                            html += renderSPField(placePrefix + '.address', 'Address', addressVal, savedPlace.address, dis, 'text', '', null, false, addressProv);
+                            html += renderSPField(placePrefix + '.city', 'City', cityVal, savedPlace.city, dis, 'text', '', null, false, cityProv);
+                            html += renderSPField(placePrefix + '.county', 'County', countyVal, savedPlace.county, dis, 'text', '', null, false, countyProv);
+                            html += renderSPField(placePrefix + '.hamlet', 'Hamlet', hamletVal, savedPlace.hamlet, dis, 'text', '', null, false, hamletProv);
+                            html += renderSPField(placePrefix + '.urban_zone', 'Urban Zone', urbanZoneVal, savedPlace.urban_zone, dis, 'text', '', null, false, urbanZoneProv);
+                            html += renderSPField(placePrefix + '.latitude', 'Latitude', latVal, savedPlace.latitude, dis, 'number', 'step="0.0000001"', null, false, latProv);
+                            html += renderSPField(placePrefix + '.longitude', 'Longitude', lngVal, savedPlace.longitude, dis, 'number', 'step="0.0000001"', null, false, lngProv);
+                            const osmTypeOptions = ['node', 'way', 'relation'].filter(o => o !== osmTypeVal);
+                            html += renderSPField(placePrefix + '.osm_type', 'OSM Type', osmTypeVal, savedPlace.osm_type, dis, 'select', '', osmTypeOptions, false, osmTypeProv);
+                            html += renderSPField(placePrefix + '.osm_id', 'OSM ID', osmIdVal, savedPlace.osm_id, dis, 'number', 'step="1" min="0"', null, false, osmIdProv);
+                            
+                            html += '</div>';
+                        });
+                        html += '<button class="sp-add-btn" onclick="addSPField()"><i class="fas fa-plus"></i> Add Location</button>';
+                        html += '<div id="intersectionFields"></div>';
+                        
                         // Key Info section — custom render with editable key, value, delete, and add-field
                         html += '<div class="section-header"><i class="fas fa-info-circle"></i> Key Info</div>';
-                        const addedKIFields = savedState?._added_key_info || [];
+                        const addedKIFields = savedFields._added_key_info || [];
                         const allKIFields = keyInfoFields.map(f => {
                             const key = f.replace('key_info.', '');
                             return { field: f, key, original: true };
@@ -916,7 +1905,7 @@
                                     html += '</div>';
                                     return;
                                 }
-                                const saved = savedFields[f] || {};
+                                const saved = (savedFields.key_info || {})[origKey] || {};
                                 const st = saved.status || '';
                                 const savedKey = (st === 'wrong' && saved.corrected_key) ? saved.corrected_key : origKey;
                                 const savedVal = (st === 'wrong' && saved.correction != null) ? saved.correction : origVal;
@@ -958,6 +1947,8 @@
                 <div id="validationNotification"></div>
             `;
 
+            updateIntersectionFields();
+
             if (isValidationLocked()) {
                 document.querySelector('.validation-fields').classList.add('validation-locked');
                 document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn').forEach(b => {
@@ -970,7 +1961,6 @@
                     document.querySelectorAll('.multi-event-radio input[name="multi_event_radio"]').forEach(r => {
                         r.disabled = true;
                     });
-                    document.querySelector('.multi-event-radio .radio-group')?.classList.add('radio-disabled');
                 }
             }
             updateProgress();

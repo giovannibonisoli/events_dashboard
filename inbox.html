@@ -100,9 +100,77 @@
             return String(d);
         }
 
+        // Helper to extract value from new schema (value + provenance)
+        function getVal(obj) {
+            if (!obj) return null;
+            if (typeof obj === 'object' && 'value' in obj) return obj.value;
+            if (typeof obj === 'object') return null;
+            return obj;
+        }
+
+// Normalize event for inbox display
+function normalizeEvent(e, lang = 'it') {
+    const firstPlace = e.single_places?.[0] || {};
+    let coordinates = { lat: null, lng: null };
+    let geocoded_place = firstPlace.geocoded_name?.value || firstPlace.address?.value || '';
+    
+    // Language-aware crossroad naming
+    const crossroadPrefix = lang === 'it' ? 'Incrocio tra ' : 'Intersection of ';
+    const crossroadConjunction = lang === 'it' ? ' e ' : ' and ';
+    const crossroadFallback = lang === 'it' ? ' e altro' : ' and other';
+    const crossroadSingle = lang === 'it' ? 'Incrocio' : 'Intersection';
+    
+    if (e.place_type === 'intersection' && e.geocoded_intersection) {
+        coordinates = {
+            lat: parseFloat(getVal(e.geocoded_intersection.latitude)) || null,
+            lng: parseFloat(getVal(e.geocoded_intersection.longitude)) || null
+        };
+        // Format crossroad name based on language
+        const wayNames = (e.single_places || []).map(p => getVal(p.geocoded_name) || getVal(p.address)).filter(Boolean);
+        if (wayNames.length >= 2) {
+            geocoded_place = `${crossroadPrefix}${wayNames[0]}${crossroadConjunction}${wayNames[1]}`;
+        } else if (wayNames.length === 1) {
+            geocoded_place = `${crossroadPrefix}${wayNames[0]}${crossroadFallback}`;
+        } else {
+            geocoded_place = crossroadSingle;
+        }
+    } else if (e.place_type === 'single' || !e.place_type) {
+        coordinates = {
+            lat: parseFloat(getVal(firstPlace.latitude)) || null,
+            lng: parseFloat(getVal(firstPlace.longitude)) || null
+        };
+        geocoded_place = getVal(firstPlace.geocoded_name) || getVal(firstPlace.address) || '';
+    } else if (e.place_type === 'multiple') {
+        const places = e.single_places || [];
+        if (places.length > 0) {
+            const lats = places.map(p => parseFloat(getVal(p.latitude))).filter(v => !isNaN(v));
+            const lngs = places.map(p => parseFloat(getVal(p.longitude))).filter(v => !isNaN(v));
+            if (lats.length > 0 && lngs.length > 0) {
+                coordinates = {
+                    lat: lats.reduce((a, b) => a + b, 0) / lats.length,
+                    lng: lngs.reduce((a, b) => a + b, 0) / lngs.length
+                };
+            }
+        }
+        geocoded_place = places.map(p => getVal(p.geocoded_name) || getVal(p.address)).filter(Boolean).join(', ') || 'Multiple locations';
+    }
+    
+    return {
+        ...e,
+        coordinates,
+        geocoded_place,
+        start_date: {
+            year: getVal(e.start_date?.year),
+            month: getVal(e.start_date?.month),
+            day: getVal(e.start_date?.day)
+        }
+    };
+}
+
         function getReason(event) {
-            if (!event.start_date || (typeof event.start_date === 'object' && event.start_date.year == null)) return 'INVALID DATE: ' + JSON.stringify(event.start_date);
-            if (!event.coordinates || event.coordinates.lat == null || event.coordinates.lng == null) return 'MISSING COORDINATES';
+            const norm = normalizeEvent(event, 'it');
+            if (!norm.start_date || (typeof norm.start_date === 'object' && norm.start_date.year == null)) return 'INVALID DATE: ' + JSON.stringify(event.start_date);
+            if (!norm.coordinates || norm.coordinates.lat == null || norm.coordinates.lng == null) return 'MISSING COORDINATES';
             return '';
         }
 
@@ -124,7 +192,10 @@
                 const data = await resp.json();
                 const allEvents = data.events || data;
 
-                const invalid = allEvents.filter(e =>
+                // Normalize events for new schema
+                const normalizedEvents = allEvents.map(e => normalizeEvent(e, 'it'));
+
+                const invalid = normalizedEvents.filter(e =>
                     !e.start_date || (typeof e.start_date === 'object' && e.start_date.year == null) || !e.coordinates || e.coordinates.lat == null || e.coordinates.lng == null
                 );
 
@@ -145,7 +216,7 @@
                     invalid.map(e => {
                         const cfg = categoryConfig[e.category] || categoryConfig.crime;
                         const reason = getReason(e);
-                        const reasonClass = !e.date ? 'reason-date' : 'reason-coords';
+                        const reasonClass = !e.start_date?.year ? 'reason-date' : 'reason-coords';
                         const done = e.url && validatedSet.has(e.url);
                         const btnLabel = done ? 'Modify Validation' : 'Validate';
                         const btnIcon = done ? 'fa-pen-to-square' : 'fa-clipboard-check';
@@ -158,7 +229,7 @@
                                 <div class="item-info">
                                     <div class="item-place">
                                         <i class="fas ${cfg.icon}" style="color:${cfg.color};width:16px;"></i>
-                                        ${e.geocoded_place || e.extracted_place || 'Unknown place'}
+                                        ${e.geocoded_place || 'Unknown place'}
                                         ${doneBadge}
                                     </div>
                                     <div class="item-meta">
@@ -195,7 +266,9 @@
                     const allEvents = data.events || data;
                     const event = allEvents.find(e => e.url === url);
                     if (event) {
-                        sessionStorage.setItem('validatingEvent', JSON.stringify(event));
+                        // Normalize for validation page
+                        const normalized = normalizeEvent(event);
+                        sessionStorage.setItem('validatingEvent', JSON.stringify(event)); // Store original for validation
                         window.location.href = 'validation.html';
                     }
                 })
