@@ -325,6 +325,12 @@ width: 100%; padding: 8px 12px;
             background: var(--bg-card); border: 1px solid var(--border);
             border-radius: 10px;
         }
+        .news-text-scroll.news-complete {
+            border-color: #4caf50; box-shadow: 0 0 0 1px #4caf5055;
+        }
+        .news-text-scroll.news-invalid {
+            border-color: #e53935; box-shadow: 0 0 0 1px #e5393555;
+        }
         .news-text-annotator {
             padding: 16px 20px; font-size: 14px; line-height: 1.75;
             color: var(--text); white-space: pre-wrap; word-break: break-word;
@@ -348,6 +354,9 @@ width: 100%; padding: 8px 12px;
         .news-unmatched-box {
             margin-top: 14px; border: 1px solid var(--border); border-radius: 10px;
             background: var(--bg-card); overflow: hidden;
+        }
+        .news-unmatched-box.news-complete {
+            border-color: #4caf50; box-shadow: 0 0 0 1px #4caf5055;
         }
         .news-unmatched-box .section-header { margin: 0; }
         .news-unmatched-hint {
@@ -379,11 +388,11 @@ width: 100%; padding: 8px 12px;
             font-size: 12px; font-weight: 500; color: var(--text);
             transition: all .15s;
         }
-        .nu-option:hover { border-color: var(--accent); }
-        .nu-option input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
+        .nu-option:hover { border-color: #4caf50; }
+        .nu-option input[type="radio"] { accent-color: #4caf50; cursor: pointer; }
         .nu-option:has(input:checked) {
-            border-color: var(--accent);
-            background: color-mix(in srgb, var(--accent) 12%, transparent);
+            border-color: #4caf50;
+            background: rgba(76,175,80,.12);
         }
         .news-annot-popover {
             position: fixed; z-index: 10000;

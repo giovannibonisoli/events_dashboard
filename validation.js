@@ -121,14 +121,16 @@ const categoryConfig = {
                               part === 'month' ? 'min="1" max="12" style="width:80px;"' :
                               'min="1" max="31" style="width:80px;"';
                 const isNone = savedNull;
+                const nullBox = isNull ? '' : `
+                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleDateNone(this)"> Null
+                            </label>`;
                 correctionHtml = `
                     <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
                         <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="number" ${attrs} placeholder="${part}" value="${isNone ? '' : String(correction ?? value ?? '')}" class="correction-date-input">
-                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
-                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleDateNone(this)"> Null
-                            </label>
+                            ${nullBox}
                         </div>
                     </div>
                 `;
@@ -255,6 +257,10 @@ const categoryConfig = {
             let correctionHtml = '';
             if (!isNew) {
                 let inputHtml = '';
+                // No "Null" option when the value is already null — it would be meaningless.
+                const nullBox = isNull ? '' :
+                    '<label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">' +
+                    '<input type="checkbox" class="correction-none-check" ' + (savedNull ? 'checked' : '') + ' onchange="toggleSPDateNone(this)"> Null</label>';
                 if (type === 'select' && selectOptions) {
                     const selectedCorrection = correction || '';
                     const isNone = savedNull;
@@ -262,12 +268,10 @@ const categoryConfig = {
                         <div style="display:flex;align-items:center;gap:8px;">
                             <select class="correction-sp-field" ${dis} ${isNone ? 'disabled' : ''}>
                                 <option value="">— Select —</option>
-                                <option value="__none__" ${isNone ? 'selected' : ''}>Null</option>
+                                ${isNull ? '' : `<option value="__none__" ${isNone ? 'selected' : ''}>Null</option>`}
                                 ${selectOptions.map(opt => `<option value="${opt}" ${selectedCorrection === opt ? 'selected' : ''}>${opt}</option>`).join('')}
                             </select>
-                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
-                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleSPDateNone(this)"> Null
-                            </label>
+                            ${nullBox}
                         </div>
                     `;
                 } else if (type === 'number') {
@@ -276,9 +280,7 @@ const categoryConfig = {
                     inputHtml = `
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="number" class="correction-sp-field" ${attrs} value="${isNone ? '' : numVal}" ${dis} ${isNone ? 'disabled' : ''}>
-                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
-                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleSPDateNone(this)"> Null
-                            </label>
+                            ${nullBox}
                         </div>
                     `;
                 } else {
@@ -286,9 +288,7 @@ const categoryConfig = {
                     inputHtml = `
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="text" class="correction-sp-field" value="${isNone ? '' : correction.replace(/"/g, '"')}" ${dis} ${isNone ? 'disabled' : ''}>
-                            <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer;">
-                                <input type="checkbox" class="correction-none-check" ${isNone ? 'checked' : ''} onchange="toggleSPDateNone(this)"> Null
-                            </label>
+                            ${nullBox}
                         </div>
                     `;
                 }
@@ -445,6 +445,17 @@ const categoryConfig = {
             }
         }
 
+        // Reset a correction block so no stale correction is kept when a field
+        // goes back from "wrong" to "correct".
+        function clearCorrectionField(container) {
+            if (!container) return;
+            container.querySelectorAll('.correction-none-check').forEach(c => { c.checked = false; });
+            container.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), textarea').forEach(inp => { inp.value = ''; });
+            container.querySelectorAll('select').forEach(sel => { sel.selectedIndex = 0; });
+            const otherInput = container.querySelector('.correction-category-other');
+            if (otherInput) otherInput.style.display = 'none';
+        }
+
         function setFieldStatus(btn, fieldName) {
             const field = btn.closest('.validation-field');
             const status = btn.dataset.status;
@@ -480,6 +491,7 @@ const categoryConfig = {
                 } else {
                     correction.style.display = 'none';
                     correction.classList.remove('show');
+                    clearCorrectionField(correction);
                 }
             }
             updateFieldAlert(field);
@@ -600,6 +612,7 @@ const categoryConfig = {
                 } else {
                     correction.style.display = 'none';
                     correction.classList.remove('show');
+                    clearCorrectionField(correction);
                 }
             }
             updateFieldAlert(field);
@@ -808,10 +821,10 @@ const categoryConfig = {
                     const numInput = el.querySelector('.correction-osm-id');
                     const v = numInput?.value?.trim();
                     correction = v || null;
-                } else if (name === 'multi_event') {
+                } else if (name === 'multi_event' && status === 'wrong') {
                     const radio = el.querySelector('.multi-event-radio input:checked');
                     correction = radio ? radio.value : null;
-                } else {
+                } else if (status === 'wrong') {
                     // Check for None checkbox for SP number fields
                     const noneCheck = el.querySelector('.correction-none-check');
                     if (noneCheck && noneCheck.checked) {
@@ -1382,6 +1395,18 @@ const categoryConfig = {
             const placesInvalid = updatePlacesWarning();
             const newsInvalid = !newsSpansState().complete;
             if (!newsInvalid) setNewsWarning(false);
+            const newsScroll = document.querySelector('.news-text-scroll');
+            if (newsScroll) {
+                const textValid = newsTextValid();
+                newsScroll.classList.toggle('news-complete', textValid);
+                newsScroll.classList.toggle('news-invalid', !textValid && newsTextTouched());
+            }
+            const unmatchedBox = document.getElementById('newsUnmatchedBox');
+            if (unmatchedBox) {
+                const items = unmatchedBox.querySelectorAll('.news-unmatched-item');
+                const marked = unmatchedBox.querySelectorAll('.news-unmatched-item input[type="radio"]:checked').length;
+                unmatchedBox.classList.toggle('news-complete', items.length > 0 && marked >= items.length);
+            }
             if (isValidationLocked()) {
                 document.getElementById('progressFill').style.width = '100%';
                 document.getElementById('progressText').textContent = lockReason();
@@ -1485,6 +1510,32 @@ const categoryConfig = {
                 if (item.querySelector('input[type="radio"]:checked')) done++;
             });
             return { total: total, done: done, complete: done >= total };
+        }
+
+        // The in-text box is green only when every predicted span is confirmed
+        // (nothing pending/wrong) and no span has been added. It stays neutral
+        // until the user actually decides something, then turns red if invalid.
+        function newsTextValid() {
+            if (!newsAnnotator) return false;
+            let hasAdded = false, allConfirmed = true;
+            (newsAnnotator.getAnnotations() || []).forEach(a => {
+                const v = a.validation || {};
+                if (v.source === 'predicted') {
+                    if (v.confirmed !== true) allConfirmed = false;
+                } else {
+                    hasAdded = true;
+                }
+            });
+            return allConfirmed && !hasAdded;
+        }
+
+        function newsTextTouched() {
+            if (!newsAnnotator) return false;
+            return (newsAnnotator.getAnnotations() || []).some(a => {
+                const v = a.validation || {};
+                if (v.source === 'predicted') return v.confirmed === true || v.wrong === true;
+                return true;
+            });
         }
 
         function setNewsWarning(show) {
@@ -1975,12 +2026,14 @@ html += '<div class="section-header"><i class="fas fa-map-marker-alt"></i> Locat
                         html += renderField('place_type', event.place_type || 'single', savedFields.place_type);
                         html += '<div id="placesWarning" class="places-warning" style="display:none;"></div>';
                         const places = event.single_places || [];
-                        const savedPlaces = savedFields._single_places || [];
+                        const savedPlaces = savedFields._single_places || savedFields.single_places || [];
                         places.forEach((place, idx) => {
-                            const savedPlace = savedPlaces[idx] || {};
+                            const savedPlaceRow = savedPlaces[idx] || {};
+                            // Saved places are stored as { fields: {...} }; older data may be flat.
+                            const savedPlace = savedPlaceRow.fields || savedPlaceRow;
                             const placePrefix = 'single_places[' + idx + ']';
-                            const isDeleted = savedPlace.deleted === true;
-                            const cls = isDeleted ? 'sp-row status-deleted' : (savedPlace.status === 'correct' ? 'sp-row status-correct' : (savedPlace.status === 'wrong' ? 'sp-row status-wrong' : 'sp-row'));
+                            const isDeleted = savedPlaceRow.deleted === true;
+                            const cls = isDeleted ? 'sp-row status-deleted' : (savedPlaceRow.status === 'correct' ? 'sp-row status-correct' : (savedPlaceRow.status === 'wrong' ? 'sp-row status-wrong' : 'sp-row'));
                             const dis = isDeleted ? 'disabled' : '';
                             
                             const specificNameVal = getVal(place.specific_name_place);
@@ -2041,7 +2094,6 @@ html += '<div class="section-header"><i class="fas fa-map-marker-alt"></i> Locat
                         html += '  <span style="margin-left:auto;">Select text to add a span · click a span to review it</span>';
                         html += '</div>';
                         html += '<div class="news-text-scroll"><div id="newsTextAnnotator" class="news-text-annotator"></div></div>';
-                        html += '<div id="newsWarning" class="news-warning" style="display:none;"></div>';
 
                         // Spans predicted but absent from the text (reformulation / hallucination)
                         const unmatchedSpans = getUnmatchedNewsSpans(event);
@@ -2063,6 +2115,7 @@ html += '<div class="section-header"><i class="fas fa-map-marker-alt"></i> Locat
                             html += '</div>';
                         });
                         html += '</div>';
+                        html += '<div id="newsWarning" class="news-warning" style="display:none;"></div>';
 
                         
                         // Key Info section — custom render with editable key, value, delete, and add-field
