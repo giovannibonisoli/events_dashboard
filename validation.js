@@ -1463,20 +1463,26 @@ const categoryConfig = {
         const NEWS_TEMPORAL = 'temporal_expression';
 
         // The whole news text counts as a single field: it is complete only when
-        // every predicted span has been reviewed (confirmed or marked wrong) AND
-        // every user-added span has been given a type (location / temporal).
+        // every predicted span has been reviewed (confirmed or marked wrong), every
+        // user-added span has been given a type (location / temporal) and every
+        // unmatched span (reformulation / hallucination) has been marked.
         function newsSpansState() {
-            if (!newsAnnotator) return { total: 0, done: 0, complete: true };
             let total = 0, done = 0;
-            (newsAnnotator.getAnnotations() || []).forEach(a => {
-                const v = a.validation || {};
-                if (v.source === 'predicted') {
-                    total++;
-                    if (v.confirmed === true || v.wrong === true) done++;
-                } else {
-                    total++;
-                    if (v.type === NEWS_LOC || v.type === NEWS_TEMPORAL) done++;
-                }
+            if (newsAnnotator) {
+                (newsAnnotator.getAnnotations() || []).forEach(a => {
+                    const v = a.validation || {};
+                    if (v.source === 'predicted') {
+                        total++;
+                        if (v.confirmed === true || v.wrong === true) done++;
+                    } else {
+                        total++;
+                        if (v.type === NEWS_LOC || v.type === NEWS_TEMPORAL) done++;
+                    }
+                });
+            }
+            document.querySelectorAll('.news-unmatched-item').forEach(item => {
+                total++;
+                if (item.querySelector('input[type="radio"]:checked')) done++;
             });
             return { total: total, done: done, complete: done >= total };
         }
@@ -1524,6 +1530,31 @@ const categoryConfig = {
             add(event.all_loc_span, NEWS_LOC, 'loc');
             add(event.all_temporal_expressions, NEWS_TEMPORAL, 'temp');
             return anns;
+        }
+
+        // Predicted spans (all_loc_span / all_temporal_expressions) that have no
+        // occurrence in the article text — the model either reformulated them or
+        // hallucinated. These cannot be annotated in the text, so they get their
+        // own review box (reformulation / hallucination).
+        function getUnmatchedNewsSpans(event) {
+            const text = typeof event.text === 'string' ? event.text : '';
+            const result = [];
+            if (!text.trim()) return result;
+            const add = (spans, type) => {
+                (spans || []).forEach(span => {
+                    if (!span) return;
+                    if (text.indexOf(span) < 0) result.push({ value: span, type: type });
+                });
+            };
+            add(event.all_loc_span, NEWS_LOC);
+            add(event.all_temporal_expressions, NEWS_TEMPORAL);
+            return result;
+        }
+
+        function escapeNewsHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         // Linear RGB mix of two #rrggbb colours (t=0 -> a, t=1 -> b).
@@ -1597,8 +1628,7 @@ const categoryConfig = {
         //   { predicted_spans: [{ value, type, status }], added_spans: [{ value, type }] }
         function buildAnnotationSpans() {
             const result = { predicted_spans: [], added_spans: [] };
-            if (!newsAnnotator) return result;
-            (newsAnnotator.getAnnotations() || []).forEach(a => {
+            (newsAnnotator ? (newsAnnotator.getAnnotations() || []) : []).forEach(a => {
                 const v = a.validation || {};
                 const parts = newsSelectorParts(a);
                 if (!parts.exact) return;
@@ -1614,6 +1644,16 @@ const categoryConfig = {
                         type: v.type || null
                     });
                 }
+            });
+            // Predicted spans absent from the text are still predicted spans;
+            // their status records whether they were a reformulation or a hallucination.
+            document.querySelectorAll('.news-unmatched-item').forEach(item => {
+                const checked = item.querySelector('input[type="radio"]:checked');
+                result.predicted_spans.push({
+                    value: item.dataset.value || '',
+                    type: item.dataset.type || null,
+                    status: checked ? checked.value : null
+                });
             });
             return result;
         }
@@ -2002,6 +2042,27 @@ html += '<div class="section-header"><i class="fas fa-map-marker-alt"></i> Locat
                         html += '</div>';
                         html += '<div class="news-text-scroll"><div id="newsTextAnnotator" class="news-text-annotator"></div></div>';
                         html += '<div id="newsWarning" class="news-warning" style="display:none;"></div>';
+
+                        // Spans predicted but absent from the text (reformulation / hallucination)
+                        const unmatchedSpans = getUnmatchedNewsSpans(event);
+                        const savedPredicted = (savedState && savedState.annotation_spans && savedState.annotation_spans.predicted_spans) || [];
+                        const unmatchedStatus = {};
+                        savedPredicted.forEach(s => { if (s && s.value) unmatchedStatus[s.value + '\u0000' + (s.type || '')] = s.status; });
+                        html += '<div id="newsUnmatchedBox" class="news-unmatched-box"' + (unmatchedSpans.length ? '' : ' style="display:none;"') + '>';
+                        html += '  <div class="section-header"><i class="fas fa-triangle-exclamation"></i> Spans not found in the text</div>';
+                        html += '  <div class="news-unmatched-hint">These predicted spans have no occurrence in the article text (the model reformulated them or hallucinated them). Mark each one.</div>';
+                        unmatchedSpans.forEach((s, i) => {
+                            const st = unmatchedStatus[s.value + '\u0000' + (s.type || '')];
+                            const isTemp = s.type === NEWS_TEMPORAL;
+                            html += '<div class="news-unmatched-item" data-value="' + escapeNewsHtml(s.value) + '" data-type="' + s.type + '">';
+                            html += '  <div class="nu-main"><span class="nu-value">' + escapeNewsHtml(s.value) + '</span><span class="nu-type nu-type-' + (isTemp ? 'temporal' : 'loc') + '">' + (isTemp ? 'Temporal' : 'Location') + '</span></div>';
+                            html += '  <div class="nu-choice">';
+                            html += '    <label class="nu-option"><input type="radio" name="news-unmatched-' + i + '" value="reformulation" onchange="updateProgress()"' + (st === 'reformulation' ? ' checked' : '') + '> Reformulation</label>';
+                            html += '    <label class="nu-option"><input type="radio" name="news-unmatched-' + i + '" value="hallucination" onchange="updateProgress()"' + (st === 'hallucination' ? ' checked' : '') + '> Hallucination</label>';
+                            html += '  </div>';
+                            html += '</div>';
+                        });
+                        html += '</div>';
 
                         
                         // Key Info section — custom render with editable key, value, delete, and add-field
