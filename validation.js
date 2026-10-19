@@ -270,14 +270,19 @@ const categoryConfig = {
                 if (type === 'select' && selectOptions) {
                     const selectedCorrection = correction || '';
                     const isNone = savedNull;
+                    // Radio buttons: every option except the starting value, plus a Null
+                    // option (omitted when the value is already null).
+                    const groupName = 'sp_radio_' + name.replace(/[^a-zA-Z0-9]+/g, '_');
+                    const radioOptions = selectOptions.filter(opt => opt !== value).map(opt => ({ value: opt, label: opt }));
+                    if (!isNull) radioOptions.push({ value: '__none__', label: 'Null' });
                     inputHtml = `
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <select class="correction-sp-field" ${dis} ${isNone ? 'disabled' : ''}>
-                                <option value="">— Select —</option>
-                                ${isNull ? '' : `<option value="__none__" ${isNone ? 'selected' : ''}>Null</option>`}
-                                ${selectOptions.map(opt => `<option value="${opt}" ${selectedCorrection === opt ? 'selected' : ''}>${opt}</option>`).join('')}
-                            </select>
-                            ${nullBox}
+                        <div class="correction-sp-radio">
+                            ${radioOptions.map(opt => `
+                                <label class="sp-radio-option">
+                                    <input type="radio" name="${groupName}" value="${opt.value}" ${isNone ? (opt.value === '__none__' ? 'checked' : '') : (selectedCorrection === opt.value ? 'checked' : '')} ${dis} onchange="updateProgress()">
+                                    <span>${opt.label}</span>
+                                </label>
+                            `).join('')}
                         </div>
                     `;
                 } else if (type === 'number') {
@@ -378,6 +383,9 @@ const categoryConfig = {
                     multiEventField.querySelectorAll('.field-status button').forEach(b => { b.disabled = true; });
                 }
             }
+            // Temporal expressions and location spans cannot be validated while
+            // the article is not an event / has no predominant event.
+            suspendNewsValidation();
             updateProgress();
         }
 
@@ -387,7 +395,24 @@ const categoryConfig = {
             document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn, .sp-row .sp-status button, .sp-row .btn-delete, .sp-add-btn').forEach(b => {
                 b.disabled = false;
             });
+            resumeNewsValidation();
             updateProgress();
+        }
+
+        // Suspend/resume the News Text validation (loc spans + temporal expressions).
+        function suspendNewsValidation() {
+            document.querySelector('.news-text-scroll')?.classList.add('news-locked');
+            document.querySelector('#newsTextAnnotator')?.classList.add('news-locked');
+            document.querySelectorAll('#newsUnmatchedBox input[type="radio"]').forEach(r => { r.disabled = true; });
+            document.querySelectorAll('#newsUnmatchedBox .nu-option').forEach(l => l.classList.add('nu-disabled'));
+            hideNewsPopover();
+        }
+
+        function resumeNewsValidation() {
+            document.querySelector('.news-text-scroll')?.classList.remove('news-locked');
+            document.querySelector('#newsTextAnnotator')?.classList.remove('news-locked');
+            document.querySelectorAll('#newsUnmatchedBox input[type="radio"]').forEach(r => { r.disabled = false; });
+            document.querySelectorAll('#newsUnmatchedBox .nu-option').forEach(l => l.classList.remove('nu-disabled'));
         }
 
         function onMultiEventChange(input) {
@@ -456,6 +481,7 @@ const categoryConfig = {
         function clearCorrectionField(container) {
             if (!container) return;
             container.querySelectorAll('.correction-none-check').forEach(c => { c.checked = false; });
+            container.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; });
             container.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), textarea').forEach(inp => { inp.value = ''; });
             container.querySelectorAll('select').forEach(sel => { sel.selectedIndex = 0; });
             const otherInput = container.querySelector('.correction-category-other');
@@ -502,19 +528,11 @@ const categoryConfig = {
             }
             updateFieldAlert(field);
 
-            if (fieldName === 'is_event') {
-                if (status === 'wrong') {
-                    lockValidation('not_event');
-                } else {
-                    unlockValidation();
-                }
-            } else if (fieldName === 'multi_event') {
-                const radio = field.querySelector('.multi-event-radio input:checked');
-                if (status === 'wrong' && radio && radio.value === 'multiple') {
-                    lockValidation('multiple');
-                } else {
-                    unlockValidation();
-                }
+            if (fieldName === 'is_event' || fieldName === 'multi_event') {
+                // Lock on the resulting value: not an event (is_event false) or a
+                // several-events article with no predominant event (multiple).
+                const key = currentLockKey();
+                if (key) lockValidation(key); else unlockValidation();
                 updateProgress();
             } else {
                 if (fieldName === 'place_type') updateIntersectionFields();
@@ -524,11 +542,8 @@ const categoryConfig = {
 
         function onMultiEventCorrection(radio) {
             const field = radio.closest('.validation-field');
-            if (radio.value === 'multiple') {
-                lockValidation('multiple');
-            } else {
-                unlockValidation();
-            }
+            const key = currentLockKey();
+            if (key) lockValidation(key); else unlockValidation();
             updateFieldAlert(field);
             updateProgress();
         }
@@ -968,9 +983,14 @@ const categoryConfig = {
                             if (noneCheck && noneCheck.checked) {
                                 correction = null;
                             } else {
-                                const correctionInput = el.querySelector('.correction-sp-field');
-                                const v = correctionInput?.value?.trim() || '';
-                                correction = (v && v !== '__none__') ? v : null;
+                                const radio = el.querySelector('.correction-sp-radio input[type="radio"]:checked');
+                                if (radio) {
+                                    correction = (radio.value && radio.value !== '__none__') ? radio.value : null;
+                                } else {
+                                    const correctionInput = el.querySelector('.correction-sp-field');
+                                    const v = correctionInput?.value?.trim() || '';
+                                    correction = (v && v !== '__none__') ? v : null;
+                                }
                             }
                         }
                     }
@@ -1078,40 +1098,62 @@ const categoryConfig = {
             return state;
         }
 
+        // Effective is_event value given the validator's decision: a confirmed
+        // field keeps the data value, a "wrong" field flips it (see getFieldsState).
+        function effectiveIsEvent() {
+            const field = document.querySelector('.validation-field[data-field="is_event"]');
+            if (!field) return null;
+            const activeBtn = field.querySelector('.field-status button[class*="active-"]');
+            if (!activeBtn) return null;
+            const ev = getEvent();
+            const dataVal = ev ? ev.is_event === true : false;
+            return activeBtn.dataset.status === 'correct' ? dataVal : !dataVal;
+        }
+
+        // Effective multi_event value: when marked wrong it is the selected
+        // correction radio, otherwise the original data value.
+        function effectiveMultiEvent() {
+            const field = document.querySelector('.validation-field[data-field="multi_event"]');
+            if (!field) return null;
+            const activeBtn = field.querySelector('.field-status button[class*="active-"]');
+            if (!activeBtn) return null;
+            if (activeBtn.dataset.status === 'wrong') {
+                const radio = field.querySelector('.multi-event-radio input:checked');
+                return radio ? radio.value : null;
+            }
+            const ev = getEvent();
+            return ev ? (ev.multi_event || 'single') : null;
+        }
+
         function isNotEvent() {
-            const isEventField = document.querySelector('.validation-field[data-field="is_event"]');
-            if (!isEventField) return false;
-            const activeBtn = isEventField.querySelector('.field-status button[class*="active-"]');
-            if (!activeBtn) return false;
-            if (activeBtn.dataset.status !== 'wrong') return false;
-            return true;
+            return effectiveIsEvent() === false;
+        }
+
+        function isMultiMultiple() {
+            return effectiveMultiEvent() === 'multiple';
         }
 
         function isValidationLocked() {
-            const multiEventField = document.querySelector('.validation-field[data-field="multi_event"]');
-            const multiEventStatus = multiEventField ? multiEventField.querySelector('.field-status button[class*="active-"]') : null;
-            if (multiEventStatus && multiEventStatus.dataset.status === 'wrong') {
-                const radio = multiEventField.querySelector('.multi-event-radio input:checked');
-                if (radio && radio.value === 'multiple') return true;
-            }
-            return isNotEvent();
+            return isNotEvent() || isMultiMultiple();
+        }
+
+        // The reason key used by lockValidation (null when validation is active).
+        function currentLockKey() {
+            if (isMultiMultiple()) return 'multiple';
+            if (isNotEvent()) return 'not_event';
+            return null;
         }
 
         function lockReason() {
-            const multiEventField = document.querySelector('.validation-field[data-field="multi_event"]');
-            const multiEventStatus = multiEventField ? multiEventField.querySelector('.field-status button[class*="active-"]') : null;
-            if (multiEventStatus && multiEventStatus.dataset.status === 'wrong') {
-                const radio = multiEventField.querySelector('.multi-event-radio input:checked');
-                if (radio && radio.value === 'multiple') return 'Multiple events, no predominant — other validations disabled';
-            }
+            if (isMultiMultiple()) return 'Multiple events, no predominant — other validations disabled';
             if (isNotEvent()) return 'Not an event — other validations disabled';
             return 'Validation disabled';
         }
 
         function allFieldsValidated() {
             if (updatePlacesWarning()) return false;
-            if (!newsSpansState().complete) return false;
             if (isValidationLocked()) return true;
+            if (!newsSpansState().complete) return false;
             const fields = document.querySelectorAll('.validation-field');
             for (const el of fields) {
                 if (el.closest('.sp-row')) continue;
@@ -1167,6 +1209,10 @@ const categoryConfig = {
                 }
                 return !!(sel && sel.value && sel.value.trim() !== '');
             }
+            const spRadios = correctionDiv.querySelector('.correction-sp-radio input[type="radio"]');
+            if (spRadios) {
+                return !!correctionDiv.querySelector('.correction-sp-radio input[type="radio"]:checked');
+            }
             const noneCheck = correctionDiv.querySelector('.correction-none-check');
             const isNone = noneCheck && noneCheck.checked;
             const provSelect = correctionDiv.querySelector('.validation-prov-select');
@@ -1203,7 +1249,7 @@ const categoryConfig = {
                 return;
             }
             const hasNone = correctionDiv.querySelector('.correction-none-check');
-            const hasRadios = correctionDiv.querySelector('.multi-event-radio input[type="radio"]');
+            const hasRadios = correctionDiv.querySelector('.multi-event-radio input[type="radio"], .correction-sp-radio input[type="radio"]');
             const provSelect = correctionDiv.querySelector('.validation-prov-select');
             const corrInput = correctionDiv.querySelector('.correction-sp-field');
             const hasCorrVal = !!(corrInput && corrInput.value && corrInput.value.trim() !== '');
@@ -1399,21 +1445,26 @@ const categoryConfig = {
             updateIntersectionInsertFields();
             updateAddedPlaceFieldStates();
             const placesInvalid = updatePlacesWarning();
-            const newsInvalid = !newsSpansState().complete;
+            const locked = isValidationLocked();
+            // Temporal/loc-span validation is suspended while locked, so it can
+            // never block the save.
+            const newsInvalid = locked ? false : !newsSpansState().complete;
             if (!newsInvalid) setNewsWarning(false);
             const newsScroll = document.querySelector('.news-text-scroll');
-            if (newsScroll) {
+            if (newsScroll && !locked) {
                 const textValid = newsTextValid();
                 newsScroll.classList.toggle('news-complete', textValid);
                 newsScroll.classList.toggle('news-invalid', !textValid && newsTextTouched());
             }
             const unmatchedBox = document.getElementById('newsUnmatchedBox');
-            if (unmatchedBox) {
+            if (unmatchedBox && !locked) {
                 const items = unmatchedBox.querySelectorAll('.news-unmatched-item');
                 const marked = unmatchedBox.querySelectorAll('.news-unmatched-item input[type="radio"]:checked').length;
                 unmatchedBox.classList.toggle('news-complete', items.length > 0 && marked >= items.length);
             }
-            if (isValidationLocked()) {
+            if (locked) {
+                document.querySelector('.news-text-scroll')?.classList.remove('news-complete', 'news-invalid');
+                document.getElementById('newsUnmatchedBox')?.classList.remove('news-complete');
                 document.getElementById('progressFill').style.width = '100%';
                 document.getElementById('progressText').textContent = lockReason();
                 const blocked = placesInvalid || newsInvalid;
@@ -2198,20 +2249,8 @@ html += '<div class="section-header"><i class="fas fa-map-marker-alt"></i> Locat
             updateIntersectionFields();
             initNewsAnnotator(event, savedState);
 
-            if (isValidationLocked()) {
-                document.querySelector('.validation-fields').classList.add('validation-locked');
-                document.querySelectorAll('.validation-field .field-status button, .ki-row .ki-status button, .ki-row .btn-delete, .ki-add-btn').forEach(b => {
-                    b.disabled = true;
-                });
-                document.querySelectorAll('.validation-field[data-field="is_event"] .field-status button').forEach(b => {
-                    b.disabled = false;
-                });
-                if (isNotEvent()) {
-                    document.querySelectorAll('.multi-event-radio input[name="multi_event_radio"]').forEach(r => {
-                        r.disabled = true;
-                    });
-                }
-            }
+            const lockKey = currentLockKey();
+            if (lockKey) lockValidation(lockKey);
             updateProgress();
         }
 

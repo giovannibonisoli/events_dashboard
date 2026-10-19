@@ -230,6 +230,27 @@
         .validation-field .multi-event-radio-option:has(input:checked) {
             border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
         }
+        .validation-field .correction-sp-radio {
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .validation-field .correction-sp-radio .sp-radio-option {
+            flex: 1; min-width: 110px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 12px; border-radius: 8px;
+            border: 1.5px solid var(--border); background: var(--bg);
+            cursor: pointer; font-size: 12px; font-weight: 500;
+            color: var(--text); transition: all .2s;
+        }
+        .validation-field .correction-sp-radio .sp-radio-option:hover {
+            border-color: var(--accent);
+        }
+        .validation-field .correction-sp-radio .sp-radio-option input[type="radio"] {
+            width: auto; padding: 0; margin: 0;
+            accent-color: var(--accent); cursor: pointer;
+        }
+        .validation-field .correction-sp-radio .sp-radio-option:has(input:checked) {
+            border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+        }
         .validation-actions { display: flex; gap: 12px; margin-top: 24px; }
         .btn-save-validation {
             background: var(--accent); color: #fff; border: none;
@@ -331,6 +352,10 @@ width: 100%; padding: 8px 12px;
         .news-text-scroll.news-invalid {
             border-color: #e53935; box-shadow: 0 0 0 1px #e5393555;
         }
+        .news-text-scroll.news-locked {
+            pointer-events: none; opacity: .55;
+        }
+        .news-text-scroll.news-locked .news-text-annotator { user-select: none; }
         .news-text-annotator {
             padding: 16px 20px; font-size: 14px; line-height: 1.75;
             color: var(--text); white-space: pre-wrap; word-break: break-word;
@@ -394,6 +419,10 @@ width: 100%; padding: 8px 12px;
             border-color: #4caf50;
             background: rgba(76,175,80,.12);
         }
+        .nu-option.nu-disabled {
+            opacity: .5; cursor: not-allowed;
+        }
+        .nu-option.nu-disabled:hover { border-color: var(--border); }
         .news-annot-popover {
             position: fixed; z-index: 10000;
             background: var(--bg-card); border: 1px solid var(--border);
