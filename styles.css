@@ -436,6 +436,8 @@ mark.hl {
 .event-type.society { background: #b3e5fc; color: #01579b; }
 .event-type.sport { background: #d7ccc8; color: #4e342e; }
 .event-type.culture { background: #f8bbd0; color: #880e4f; }
+.event-type.traffic { background: #ffe0b2; color: #ef6c00; }
+.event-type.other { background: #cfd8dc; color: #546e7a; }
 
 .no-events {
     text-align: center;

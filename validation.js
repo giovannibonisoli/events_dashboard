@@ -6,7 +6,9 @@ const categoryConfig = {
             'health': { color: '#1b5e20', icon: 'fa-heartbeat', label: 'Health' },
             'society': { color: '#01579b', icon: 'fa-users', label: 'Society & Daily Life' },
             'sport': { color: '#4e342e', icon: 'fa-futbol', label: 'Sport' },
-            'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' }
+            'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' },
+            'traffic': { color: '#ef6c00', icon: 'fa-traffic-light', label: 'Traffic' },
+            'other': { color: '#546e7a', icon: 'fa-question', label: 'Other' }
         };
 
         // Helper to extract value from { value } schema
@@ -51,7 +53,7 @@ const categoryConfig = {
 
         function renderValue(val) {
             if (val === null || val === undefined || val === '') {
-                return '<span class="null-value">—</span>';
+                return '<span class="null-value">null</span>';
             }
             if (typeof val === 'boolean') return val ? 'Yes' : 'No';
             if (typeof val === 'object' && val.day) return `${val.day}/${val.month}/${val.year}`;
@@ -91,10 +93,10 @@ const categoryConfig = {
             const displayValue = name === 'category'
                 ? (categoryConfig[value] ? categoryConfig[value].label : value)
                 : name === 'multi_event'
-                    ? (value === 'single' ? 'Single event' : value === 'main_secondary' ? 'Main + secondary' : value === 'multiple' ? 'Multiple events' : value || '—')
+                    ? (value === 'single' ? 'Single event' : value === 'main_secondary' ? 'Main + secondary' : value === 'multiple' ? 'Multiple events' : value || 'null')
                     : name === 'place_type'
-                        ? (value === 'single' ? 'Single place' : value === 'intersection' ? 'Intersection' : value === 'multiple' ? 'Multiple places' : value || '—')
-                        : (isDatePart && isNull) ? 'None'
+                        ? (value === 'single' ? 'Single place' : value === 'intersection' ? 'Intersection' : value === 'multiple' ? 'Multiple places' : value || 'null')
+                        : (isDatePart && isNull) ? 'null'
                         : value;
 
             let correctionHtml = '';
@@ -102,17 +104,21 @@ const categoryConfig = {
                 correctionHtml = '';
             } else if (name === 'category') {
                 const currentVal = typeof value === 'string' ? value : '';
-                const catOptions = Object.keys(categoryConfig).filter(k => k !== currentVal);
+                // "other" is not a fixed option: it is the free-text "new category" option.
+                const fixedCats = Object.keys(categoryConfig).filter(k => k !== 'other');
+                const catOptions = fixedCats.filter(k => k !== currentVal);
                 const selectedCorrection = (savedStatus === 'wrong' && correction) ? correction : '';
+                const isOther = !!selectedCorrection && !fixedCats.includes(selectedCorrection);
+                const otherText = (isOther && selectedCorrection !== 'other' && selectedCorrection !== '__other__') ? selectedCorrection : '';
                 correctionHtml = `
                     <div class="field-correction ${savedStatus === 'wrong' ? 'show' : ''}">
                         <div class="correction-label"><i class="fas fa-pen"></i> Corrected value</div>
                         <select class="correction-category" onchange="toggleCategoryOther(this)">
                             <option value="">— Select category —</option>
                             ${catOptions.map(k => `<option value="${k}" ${selectedCorrection === k ? 'selected' : ''}>${categoryConfig[k].label}</option>`).join('')}
-                            <option value="__other__" ${selectedCorrection && !catOptions.includes(selectedCorrection) ? 'selected' : ''}>Other</option>
+                            <option value="__other__" ${isOther ? 'selected' : ''}>Other</option>
                         </select>
-                        <input type="text" class="correction-category-other" placeholder="Specify custom category..." style="${selectedCorrection && !catOptions.includes(selectedCorrection) ? 'display:block;margin-top:6px;' : 'display:none;margin-top:6px;'}" value="${selectedCorrection && !catOptions.includes(selectedCorrection) ? selectedCorrection.replace(/"/g, '&quot;') : ''}">
+                        <input type="text" class="correction-category-other" placeholder="Specify custom category..." style="${isOther ? 'display:block;margin-top:6px;' : 'display:none;margin-top:6px;'}" value="${otherText.replace(/"/g, '&quot;')}">
                     </div>
                 `;
             } else if (isDatePart) {
@@ -301,7 +307,7 @@ const categoryConfig = {
                 `;
             }
             
-            const displayValue = isNull ? '—' : value;
+            const displayValue = isNull ? 'null' : value;
             const provenanceBadge = provenance ? `<span class="provenance-badge" style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg-hover);color:var(--text-muted);margin-left:6px;font-family:'IBM Plex Mono',monospace;">${provenance}</span>` : '';
 
             // For new fields, show as editable inputs without validation buttons
@@ -799,7 +805,7 @@ const categoryConfig = {
                     if (catSelect && catSelect.value) {
                         if (catSelect.value === '__other__') {
                             const otherInput = el.querySelector('.correction-category-other');
-                            correction = otherInput?.value?.trim() || '__other__';
+                            correction = otherInput?.value?.trim() || 'other';
                         } else {
                             correction = catSelect.value;
                         }
@@ -1946,7 +1952,7 @@ const categoryConfig = {
                 return;
             }
 
-            const cfg = categoryConfig[event.category] || categoryConfig.crime;
+            const cfg = categoryConfig[event.category] || categoryConfig.other;
             const fields = getAllFieldNames(event);
             const keyInfoFields = fields.filter(f => f.startsWith('key_info.'));
 

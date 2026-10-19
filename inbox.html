@@ -84,7 +84,9 @@
             'health': { color: '#1b5e20', icon: 'fa-heartbeat', label: 'Health' },
             'society': { color: '#01579b', icon: 'fa-users', label: 'Society & Daily Life' },
             'sport': { color: '#4e342e', icon: 'fa-futbol', label: 'Sport' },
-            'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' }
+            'culture': { color: '#880e4f', icon: 'fa-music', label: 'Culture & Entertainment' },
+            'traffic': { color: '#ef6c00', icon: 'fa-traffic-light', label: 'Traffic' },
+            'other': { color: '#546e7a', icon: 'fa-question', label: 'Other' }
         };
 
         function formatDate(d) {
@@ -214,7 +216,7 @@ function normalizeEvent(e, lang = 'it') {
 
                 container.innerHTML = `<div class="inbox-list">${
                     invalid.map(e => {
-                        const cfg = categoryConfig[e.category] || categoryConfig.crime;
+                        const cfg = categoryConfig[e.category] || categoryConfig.other;
                         const reason = getReason(e);
                         const reasonClass = !e.start_date?.year ? 'reason-date' : 'reason-coords';
                         const done = e.url && validatedSet.has(e.url);

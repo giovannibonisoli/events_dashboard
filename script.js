@@ -57,6 +57,20 @@ const categoryConfig = {
         icon: 'fa-music', 
         label: 'Culture & Entertainment',
         labelIt: 'Cultura e spettacolo'
+    },
+    'traffic': { 
+        key: 'traffic', 
+        color: '#ef6c00', 
+        icon: 'fa-traffic-light', 
+        label: 'Traffic',
+        labelIt: 'Traffico'
+    },
+    'other': { 
+        key: 'other', 
+        color: '#546e7a', 
+        icon: 'fa-question', 
+        label: 'Other',
+        labelIt: 'Altro'
     }
 };
 
@@ -142,7 +156,7 @@ function placeDetailHtml(hamlet, urbanZone, keyword) {
 // Normalize new schema to internal format used by the app
 function normalizeEvent(e, lang = 'it') {
     const firstPlace = e.single_places?.[0] || {};
-    let coordinates = { lat: 0, lng: 0 };
+    let coordinates = { lat: null, lng: null };
     let geocoded_place = placeNameFrom(firstPlace);
     let allPlaces = [];
     let locationProvenance = {};
@@ -168,8 +182,8 @@ function normalizeEvent(e, lang = 'it') {
     if (e.place_type === 'intersection' && e.geocoded_intersection) {
         // Use crossroad coordinates
         coordinates = {
-            lat: parseFloat(unwrapValue(e.geocoded_intersection.latitude)) || 0,
-            lng: parseFloat(unwrapValue(e.geocoded_intersection.longitude)) || 0
+            lat: parseFloat(unwrapValue(e.geocoded_intersection.latitude)) || null,
+            lng: parseFloat(unwrapValue(e.geocoded_intersection.longitude)) || null
         };
         // Format crossroad name based on language
         const wayNames = (e.single_places || []).map(p => placeNameFrom(p)).filter(Boolean);
@@ -193,8 +207,8 @@ function normalizeEvent(e, lang = 'it') {
     } else if (e.place_type === 'single' || !e.place_type) {
         // Use first (or only) place
         coordinates = {
-            lat: parseFloat(unwrapValue(firstPlace.latitude)) || 0,
-            lng: parseFloat(unwrapValue(firstPlace.longitude)) || 0
+            lat: parseFloat(unwrapValue(firstPlace.latitude)) || null,
+            lng: parseFloat(unwrapValue(firstPlace.longitude)) || null
         };
         geocoded_place = placeNameFrom(firstPlace);
         locationProvenance = getLocFields(firstPlace);
@@ -210,8 +224,8 @@ function normalizeEvent(e, lang = 'it') {
         // Multiple places - store all for map visualization
         const places = e.single_places || [];
         allPlaces = places.map(p => ({
-            lat: parseFloat(unwrapValue(p.latitude)) || 0,
-            lng: parseFloat(unwrapValue(p.longitude)) || 0,
+            lat: parseFloat(unwrapValue(p.latitude)) || null,
+            lng: parseFloat(unwrapValue(p.longitude)) || null,
             name: placeNameFrom(p),
             hamlet: unwrapValue(p.hamlet),
             urbanZone: unwrapValue(p.urban_zone),
@@ -287,6 +301,8 @@ function getFallbackEvents() {
 // 3. APP STATE
 // =============================================
 let currentMarkers = [];
+let currentPolylines = [];
+let markerCluster = null;
 let selectedArea = null;
 let map = null;
 let drawnItems = null;
@@ -307,6 +323,19 @@ function initMap() {
     }).addTo(map);
 
     drawnItems = L.featureGroup().addTo(map);
+
+    // Cluster only markers that sit on (almost) the same pixel, so events sharing
+    // coordinates collapse into one bubble that fans out (spiderfies) on click.
+    markerCluster = L.markerClusterGroup({
+        maxClusterRadius: 1,
+        spiderfyOnMaxZoom: true,
+        zoomToBoundsOnClick: false,
+        showCoverageOnHover: false,
+        spiderfyDistanceMultiplier: 1.5
+    }).addTo(map);
+    markerCluster.on('clusterclick', function (e) {
+        e.layer.spiderfy();
+    });
 
     // Geoman: qualunque forma disegnata finisce dentro drawnItems invece che
     // direttamente sulla mappa
@@ -430,7 +459,7 @@ function checkLeafletDraw() {
 // 5. MARKERS
 // =============================================
 function getMarkerIcon(categoryKey) {
-    const config = categoryConfig[categoryKey] || categoryConfig['crime'];
+    const config = categoryConfig[categoryKey] || categoryConfig['other'];
     return L.divIcon({
         className: 'custom-marker',
         html: `<div style="
@@ -512,7 +541,9 @@ function updateMarkers(filteredEvents, keyword) {
         return;
     }
     
-    currentMarkers.forEach(m => map.removeLayer(m));
+    if (markerCluster) markerCluster.clearLayers();
+    currentPolylines.forEach(p => map.removeLayer(p));
+    currentPolylines = [];
     currentMarkers = [];
     
     if (!filteredEvents || filteredEvents.length === 0) {
@@ -525,7 +556,7 @@ function updateMarkers(filteredEvents, keyword) {
     const t = translations[currentLanguage];
 
     filteredEvents.forEach(event => {
-        const config = categoryConfig[event.category] || categoryConfig['crime'];
+        const config = categoryConfig[event.category] || categoryConfig['other'];
         const places = event.allPlaces || [];
         const isMultiple = event.place_type === 'multiple' && places.length > 1;
         const isCrossroad = event.place_type === 'intersection';
@@ -540,7 +571,7 @@ function updateMarkers(filteredEvents, keyword) {
                 const marker = L.marker(
                     [place.lat, place.lng], 
                     { icon: getMarkerIcon(event.category), pmIgnore: true }
-                ).addTo(map);
+                );
                 
                 const categoryLabel = t.categories[event.category] || config.label;
                 const placeName = place.name || `Location ${idx + 1}`;
@@ -577,14 +608,14 @@ function updateMarkers(filteredEvents, keyword) {
                     lineCap: 'round',
                     lineJoin: 'round'
                 }).addTo(map);
-                currentMarkers.push(polyline);
+                currentPolylines.push(polyline);
             }
         } else {
             // Single or crossroad: single marker
             const marker = L.marker(
                 [event.coordinates.lat, event.coordinates.lng], 
                 { icon: getMarkerIcon(event.category), pmIgnore: true }
-            ).addTo(map);
+            );
 
             const categoryLabel = t.categories[event.category] || config.label;
 
@@ -629,6 +660,10 @@ function updateMarkers(filteredEvents, keyword) {
             currentMarkers.push(marker);
         }
     });
+
+    if (markerCluster && currentMarkers.length > 0) {
+        markerCluster.addLayers(currentMarkers);
+    }
 
     // Aggiorna il contatore con il numero di eventi validi
     document.getElementById('eventCount').textContent = filteredEvents.length;
@@ -676,7 +711,10 @@ function applyFilters() {
         if (endDate && eDate > endDate) return false;
         
         if (selectedCategories.length > 0) {
-            if (!selectedCategories.includes(e.category)) return false;
+            const isKnownCategory = !!categoryConfig[e.category];
+            const categoryMatches = selectedCategories.includes(e.category) ||
+                (!isKnownCategory && selectedCategories.includes('other'));
+            if (!categoryMatches) return false;
         }
         
         if (keyword) {
@@ -741,7 +779,7 @@ function updateEventsList(filteredEvents) {
 
 container.innerHTML = filteredEvents.map(e => {
         try {
-            const config = categoryConfig[e.category] || categoryConfig['crime'];
+            const config = categoryConfig[e.category] || categoryConfig['other'];
             const categoryLabel = t.categories[e.category] || config.label;
             
             const urlHtml = e.url ? `
@@ -1031,7 +1069,9 @@ const translations = {
             'health': 'Health',
             'society': 'Society & Daily Life',
             'sport': 'Sport',
-            'culture': 'Culture & Entertainment'
+            'culture': 'Culture & Entertainment',
+            'traffic': 'Traffic',
+            'other': 'Other'
         },
 
         checkboxCategories: {
@@ -1043,7 +1083,9 @@ const translations = {
             'health': 'Health',
             'society': 'Society',
             'sport': 'Sport',
-            'culture': 'Culture'
+            'culture': 'Culture',
+            'traffic': 'Traffic',
+            'other': 'Other'
         },
         // Buttons
         exportValidatedNews: 'Export validated news',
@@ -1089,7 +1131,9 @@ const translations = {
             'health': 'Sanità e salute',
             'society': 'Società e vita quotidiana',
             'sport': 'Sport',
-            'culture': 'Cultura e spettacolo'
+            'culture': 'Cultura e spettacolo',
+            'traffic': 'Traffico',
+            'other': 'Altro'
         },
         checkboxCategories: {
             'all': 'Tutte',
@@ -1100,7 +1144,9 @@ const translations = {
             'health': 'Sanità',
             'society': 'Società',
             'sport': 'Sport',
-            'culture': 'Cultura'
+            'culture': 'Cultura',
+            'traffic': 'Traffico',
+            'other': 'Altro'
         },
         // Buttons
         exportValidatedNews: 'Esporta notizie validate',
@@ -1188,7 +1234,7 @@ function updateLegend(lang) {
     if (title) title.innerHTML = `<i class="fas fa-tag"></i> ${t.legend}`;
     
     // Categorie - usa 'weather' invece di 'disasters'
-    const keys = ['crime', 'justice', 'accidents', 'weather', 'health', 'society', 'sport', 'culture'];
+    const keys = ['crime', 'justice', 'accidents', 'weather', 'health', 'society', 'sport', 'culture', 'traffic', 'other'];
     const items = legend.querySelectorAll('.legend-item');
     
     items.forEach((item, i) => {
