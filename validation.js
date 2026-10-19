@@ -1612,6 +1612,24 @@ const categoryConfig = {
             setNewsWarning(newsInteracted && !newsSpansState().complete);
         }
 
+        // Case-insensitive first occurrence of `needle` in `haystack`, returning
+        // the index in the original string (so position selectors stay correct).
+        function newsIndexOf(haystack, needle, from = 0) {
+            if (!needle) return -1;
+            const lowerHay = haystack.toLowerCase();
+            const lowerNeedle = needle.toLowerCase();
+            // toLowerCase can change length for a few Unicode chars; fall back to
+            // comparing equal-length windows of the original then.
+            if (lowerHay.length === haystack.length && lowerNeedle.length === needle.length) {
+                return lowerHay.indexOf(lowerNeedle, Math.max(0, from));
+            }
+            const nLen = needle.length;
+            for (let i = Math.max(0, from); i + nLen <= haystack.length; i++) {
+                if (haystack.substr(i, nLen).toLowerCase() === lowerNeedle) return i;
+            }
+            return -1;
+        }
+
         // Build W3C annotations for the first occurrence of every all_loc_span /
         // all_temporal_expressions entry. The type + verdict ride in a custom
         // top-level `validation` field (preserved by the W3C adapter on round-trip).
@@ -1620,14 +1638,14 @@ const categoryConfig = {
             const add = (spans, type, prefix) => {
                 (spans || []).forEach((span, i) => {
                     if (!span) return;
-                    const start = text.indexOf(span);
+                    const start = newsIndexOf(text, span);
                     if (start < 0) return;
                     anns.push({
                         id: 'pred-' + prefix + '-' + i,
                         body: [],
                         target: {
                             selector: [
-                                { type: 'TextQuoteSelector', exact: span },
+                                { type: 'TextQuoteSelector', exact: text.substr(start, span.length) },
                                 { type: 'TextPositionSelector', start: start, end: start + span.length }
                             ]
                         },
@@ -1651,7 +1669,7 @@ const categoryConfig = {
             const add = (spans, type) => {
                 (spans || []).forEach(span => {
                     if (!span) return;
-                    if (text.indexOf(span) < 0) result.push({ value: span, type: type });
+                    if (newsIndexOf(text, span) < 0) result.push({ value: span, type: type });
                 });
             };
             add(event.all_loc_span, NEWS_LOC);
@@ -1938,10 +1956,10 @@ const categoryConfig = {
                     // Rebuild predicted spans from the event, then re-apply the saved status.
                     const statusByKey = {};
                     (spans.predicted_spans || []).forEach(s => {
-                        if (s && s.value) statusByKey[s.value + '\u0000' + (s.type || '')] = s.status;
+                        if (s && s.value) statusByKey[(s.value + '\u0000' + (s.type || '')).toLowerCase()] = s.status;
                     });
                     buildPredictedNewsAnnotations(event, text).forEach(a => {
-                        const key = a.target.selector[0].exact + '\u0000' + (a.validation.type || '');
+                        const key = (a.target.selector[0].exact + '\u0000' + (a.validation.type || '')).toLowerCase();
                         const status = statusByKey[key];
                         if (status === 'wrong') a.validation.wrong = true;
                         else if (status === 'correct') a.validation.confirmed = true;
@@ -1950,14 +1968,14 @@ const categoryConfig = {
                     // Re-create added spans from their text value (first occurrence).
                     (spans.added_spans || []).forEach((s, i) => {
                         if (!s || !s.value) return;
-                        const start = text.indexOf(s.value);
+                        const start = newsIndexOf(text, s.value);
                         if (start < 0) return;
                         newsAnnotator.addAnnotation({
                             id: 'added-' + i + '-' + Date.now(),
                             body: [],
                             target: {
                                 selector: [
-                                    { type: 'TextQuoteSelector', exact: s.value },
+                                    { type: 'TextQuoteSelector', exact: text.substr(start, s.value.length) },
                                     { type: 'TextPositionSelector', start: start, end: start + s.value.length }
                                 ]
                             },
